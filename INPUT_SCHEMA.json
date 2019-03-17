@@ -1,0 +1,31 @@
+{
+    "title": "Rust crawler",
+    "type": "object",
+    "schemaVersion": 1,
+    "required": [],
+    "properties": {
+        "urls": {
+            "title": "Start URLs",
+            "type": "array",
+            "description": "URLs to start with",
+            "prefill": [
+                { "url": "http://example.com" },
+                { "url": "http://example.com/some-path" }
+            ],
+            "editor": "requestListSources"
+        },
+        "proxy_settings": {
+            "title": "Proxy configuration",
+            "type": "object",
+            "description": "Select proxies to be used by your crawler.",
+            "prefill": { "useApifyProxy": true },
+            "editor": "proxy"
+        },
+        "extract": {
+            "title": "Extract config",
+            "type": "array",
+            "description": "",
+            "editor": "json"
+        }
+    }
+}
