@@ -17,7 +17,7 @@ The main speed advantage it has is in HTML parsing where its efficient data stru
 ### Input
 Input in a JSON object with these properties. You can also set it up on Apify platform with a nice UI.
 - `startUrls` (array(object)) Array of [request objects](https://sdk.apify.com/docs/api/request#docsNav). At the simplest level a request object looks like this: `{ "url": "http://example.com" }`
-- `proxy_settings` (object) Proxy configuration of the actor. By default it uses automatic proxy but you can set it to `None` by passing `{ use-apify_proxy: false }`.
+- `proxy_settings` (object) Proxy configuration of the actor. By default it uses automatic proxy but you can set it to `None` by passing `{ useApifyProxy: false }`.
 - `extact` (object) Extraction config. This will determine how and what data will be extracted. Check [Data extraction](#data-extraction)
 
 ### Data extraction
@@ -34,13 +34,13 @@ Full INPUT example:
 ```
 {
     "proxy_settings": {
-        "use_apify_proxy": true,
-        "apify_proxy_groups": ["SHADER"] // Usually you want to skip specifying groups
+        "useApifyProxy": true,
+        "apifyProxyGroups": ["SHADER"]
     },
     "urls": [
-        "https://www.amazon.com/dp/B01CYYU8YW",
-        "https://www.amazon.com/dp/B01FXMDA2O",
-        "https://www.amazon.com/dp/B00UNT0Y2M"
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" }
     ],
     "extract": [
         {

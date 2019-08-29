@@ -30,7 +30,7 @@ use proxy::{get_apify_proxy};
 fn main() {
     let input: Input = get_value("INPUT");
 
-    let sources = input.urls; //.iter().map(|req| Request::new(req.url.clone())).collect();
+    let sources = input.urls.iter().map(|req| Request::new(req.url.clone())).collect();
 
     let req_list = RequestList::new(sources);
 
