@@ -19,7 +19,7 @@ impl Proxy {
 }
 
 pub fn get_apify_proxy (settings: &Option<ProxySettings>) -> Option<Proxy> {
-    println!("proxy settings {:?}", settings);
+    // println!("proxy settings {:?}", settings);
     let use_apify_proxy = match settings {
         None => false,
         Some(settings) => settings.useApifyProxy
