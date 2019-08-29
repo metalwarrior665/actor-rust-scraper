@@ -24,7 +24,7 @@
         "extract": {
             "title": "Extraction config",
             "type": "array",
-            "description": "",
+            "description": "See readme for more info",
             "editor": "json",
             "prefill": [
                 {
