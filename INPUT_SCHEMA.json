@@ -25,7 +25,23 @@
             "title": "Extraction config",
             "type": "array",
             "description": "",
-            "editor": "json"
+            "editor": "json",
+            "prefill": [
+                {
+                  "field_name": "title",
+                  "selector": "h1",
+                  "extract_type": {
+                    "type": "Text"
+                  }
+                },
+                {
+                  "field_name": "description",
+                  "selector": "p",
+                  "extract_type": {
+                    "type": "Text"
+                  }
+                }
+            ]
         }
     }
 }
