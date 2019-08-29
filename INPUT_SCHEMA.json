@@ -9,8 +9,7 @@
             "type": "array",
             "description": "URLs to start with",
             "prefill": [
-                { "url": "http://example.com" },
-                { "url": "http://example.com/some-path" }
+                { "url": "http://example.com" }
             ],
             "editor": "requestListSources"
         },
