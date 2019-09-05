@@ -31,7 +31,10 @@ pub fn get_apify_proxy (settings: &Option<ProxySettings>) -> Option<Proxy> {
 }
 
 fn construct_proxy (groups: Option<Vec<String>>) -> Proxy {
-    let password = env::var("APIFY_PROXY_PASSWORD").unwrap();
+    let password = match env::var("APIFY_PROXY_PASSWORD") {
+        Ok(pass) => pass,
+        Err(_) => panic!("Missing APIFY_PROXY_PASSWORD environment variable. This is required to use Apify proxy!")
+    };
     let username = match groups {
         None => "auto".to_owned(),
         Some(groups) => {
