@@ -77,6 +77,8 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: 
         map.insert(extr.field_name.clone(), insert_value);
     });
 
+    let mapSize = map.len();
+
     let value = serde_json::to_value(map).unwrap();
     let extractTime = now.elapsed().as_millis();
 
@@ -84,5 +86,14 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: 
     push_data(&vec![value]);
     let pushTime = now.elapsed().as_millis();
 
-    println!("SUCCESS - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}", &req.url, requestTime, parseTime, extractTime, pushTime);
+    println!(
+        "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
+        mapSize,
+        extract.len(),
+        &req.url,
+        requestTime,
+        parseTime,
+        extractTime,
+        pushTime
+    );
 }
