@@ -32,12 +32,13 @@ impl Crawler {
         // std_async style
         // let tasks = futures.map(|fut| task::spawn(fut));
 
-        // tokio style
-        let tasks = futures.map(|fut| tokio::spawn(fut));
+        let fut = futures::future::join_all(futures.into_iter()).await;
 
-        for task in tasks.into_iter() {
-            task.await;
-        }
+        // tokio::spawn(fut).await;
+        // tokio style
+        // let tasks = futures.map(|fut| tokio::spawn(fut));
+
+        // futures::future::join_all(tasks.into_iter()).await;
     } 
 
     // Was naively trying to pass async function in

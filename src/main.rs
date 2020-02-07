@@ -4,6 +4,7 @@ extern crate scraper;
 extern crate serde;
 extern crate rayon;
 extern crate tokio;
+extern crate futures;
 
 #[macro_use] extern crate serde_derive;
 
