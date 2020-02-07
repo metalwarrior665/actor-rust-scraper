@@ -67,7 +67,6 @@ async fn main() {
     }
 }
 
-
 fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: &Option<ProxySettings>) {
     let proxy_url = get_apify_proxy(&proxy_settings);
 

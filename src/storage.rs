@@ -64,15 +64,25 @@ pub fn get_value (key: &str) -> Input {
     println!("Is on Apify? -> {}", is_on_apify);
     let json = if is_on_apify {
         let default_kv = env::var("APIFY_DEFAULT_KEY_VALUE_STORE_ID").unwrap();
-        println!("Default KV -> {}", is_on_apify);
+        println!("Default KV -> {}", default_kv);
         let url = format!("https://api.apify.com/v2/key-value-stores/{}/records/{}", default_kv, key);
         let val = request_text(&url, &None);
-        println!("Loaded value from KV -> {}", is_on_apify);
+        println!("Loaded value from KV -> {}", val);
         val
     } else {
         fs::read_to_string("apify_storage/key_value_stores/default/INPUT.JSON").unwrap()
     };
-    from_str(&json).unwrap()
+
+    match from_str(&json) {
+        Ok(input) => {
+            println!("Parsed input into: {:?}", input);
+            input
+        },
+        Err(error) => {
+            println!("Parsing failed with error: {}", error);
+            panic!("");
+        }
+    }
 }
 
 #[allow(dead_code)]
