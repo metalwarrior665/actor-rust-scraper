@@ -61,10 +61,14 @@ pub async fn push_data_async (data: Vec<Value>) {
 
 pub fn get_value (key: &str) -> Input {
     let is_on_apify = get_is_on_apify();
+    println!("Is on Apify? -> {}", is_on_apify);
     let json = if is_on_apify {
         let default_kv = env::var("APIFY_DEFAULT_KEY_VALUE_STORE_ID").unwrap();
+        println!("Default KV -> {}", is_on_apify);
         let url = format!("https://api.apify.com/v2/key-value-stores/{}/records/{}", default_kv, key);
-        request_text(&url, &None)
+        let val = request_text(&url, &None);
+        println!("Loaded value from KV -> {}", is_on_apify);
+        val
     } else {
         fs::read_to_string("apify_storage/key_value_stores/default/INPUT.JSON").unwrap()
     };

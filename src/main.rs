@@ -32,6 +32,9 @@ use input::{Input, Extract, ExtractType, ProxySettings};
 use storage::{ push_data_async, request_text_async, push_data,request_text, get_value}; //
 use proxy::{get_apify_proxy};
 
+
+// To not compile libraries on Apify, it is important to not commit Cargo.lock
+
 #[tokio::main]
 async fn main() {
     let input: Input = get_value("INPUT");

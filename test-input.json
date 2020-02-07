@@ -1,0 +1,63 @@
+{
+    "run_async": true,
+    "proxy_settings": {
+        "useApifyProxy": false,
+        "apifyProxyGroups": ["SHADER"]
+    },
+    "urls": [
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" },
+        { "url": "https://www.amazon.com/dp/B01CYYU8YW" },
+        { "url": "https://www.amazon.com/dp/B01FXMDA2O" },
+        { "url": "https://www.amazon.com/dp/B00UNT0Y2M" }
+    ],
+    "extract": [
+        {
+            "field_name": "title",
+            "selector": "#productTitle",
+            "extract_type": {
+                "type": "Text"
+            }
+        },
+        {
+            "field_name": "reviews",
+            "selector": "#acrCustomerReviewText",
+            "extract_type": {
+                "type": "Text"
+            }
+        },
+        {
+            "field_name": "seller_url",
+            "selector": "#bylineInfo",
+            "extract_type": {
+                "type": "Attribute",
+                "content": "href"
+            }
+        }    
+    ]
+}
