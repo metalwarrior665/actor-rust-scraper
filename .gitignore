@@ -2,3 +2,4 @@
 **/*.rs.bk
 
 apify_storage
+Cargo.lock
