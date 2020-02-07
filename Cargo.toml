@@ -12,4 +12,5 @@ scraper = "0.11.0"
 serde = "1.0"
 serde_derive = "1.0"
 async-std = "1.5.0"
+tokio = {version = "0.2.11", features = ["full"]}
 

@@ -3,6 +3,7 @@ extern crate serde_json;
 extern crate scraper;
 extern crate serde;
 extern crate rayon;
+extern crate tokio;
 
 #[macro_use] extern crate serde_derive;
 
@@ -10,7 +11,7 @@ use std::time::{Instant};
 use std::clone::Clone;
 use std::collections::HashMap;
 
-use async_std::prelude::*;
+// use async_std::prelude::*;
 use async_std::task;
 
 use scraper::{Selector, Html};
@@ -27,12 +28,22 @@ use request::Request;
 use requestlist::RequestList;
 use crate::crawler::Crawler;
 use input::{Input, Extract, ExtractType, ProxySettings};
-use storage::{get_value, push_data, push_data_async, request_text, request_text_async};
+use storage::{ push_data_async, request_text_async, push_data,request_text, get_value}; //
 use proxy::{get_apify_proxy};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let input: Input = get_value("INPUT");
     println!("STATUS --- Loaded Input");
+
+    /*
+    let input: Input = Input {
+        run_async: true,
+        urls: vec![Request { url: String::from("https://www.amazon.com/dp/B01CYYU8YW") }],
+        extract: vec![Extract {field_name: String::from("field") , selector: String::from("#productTitle"), extract_type:  ExtractType::Text }],
+        proxy_settings: Some(ProxySettings {useApifyProxy: true, apifyProxyGroups: None })
+    };
+    */
 
     let sources = input.urls.iter().map(|req| Request::new(req.url.clone())).collect();
 
@@ -42,14 +53,16 @@ fn main() {
 
     if input.run_async {
         println!("STATUS --- Starting Async Crawler");
-        task::block_on(async {
+        // Comment on/off depending on using tokio
+        // task::block_on(async {
             crwl.run_async().await;
-        })
+        // })
     } else {
         println!("STATUS --- Starting Sync Crawler");
         crwl.run(extract_data_from_url);
     }
 }
+
 
 fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: &Option<ProxySettings>) {
     let proxy_url = get_apify_proxy(&proxy_settings);

@@ -22,18 +22,18 @@ impl Crawler {
             proxy_settings
         }
     }
-    /*
-    pub fn run(&self, f: fn(&Request, &Vec<Extract>) -> Value) -> Vec<Value> {
-        self.request_list.sources.par_iter().map(|req| f(req, &self.extract)).collect()
-    } 
-    */
+    
     pub fn run(&self, f: fn(&Request, &Vec<Extract>, &Option<ProxySettings>)) {
         self.request_list.sources.par_iter().for_each(|req| f(req, &self.extract, &self.proxy_settings));
     }   
 
     pub async fn run_async(self) { 
         let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(req.clone(), self.extract.clone(), self.proxy_settings.clone()));
-        let tasks = futures.map(|fut| task::spawn(fut));
+        // std_async style
+        // let tasks = futures.map(|fut| task::spawn(fut));
+
+        // tokio style
+        let tasks = futures.map(|fut| tokio::spawn(fut));
 
         for task in tasks.into_iter() {
             task.await;
