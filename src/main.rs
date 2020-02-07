@@ -125,65 +125,77 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: 
 }
 
 async fn extract_data_from_url_async(req: Request, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>) {
-    println!("started async extraction");
+    // println!("started async extraction");
     let proxy_url = get_apify_proxy(&proxy_settings);
 
     let now = Instant::now();
     let url = req.url.clone();
-    let html = request_text_async(url, &proxy_url).await;
+    let response = request_text_async(url, &proxy_url).await;
     let request_time = now.elapsed().as_millis();
 
-    println!("Reqwest retuned");
-
-    let now = Instant::now();
-    let dom = Html::parse_document(&html).clone();
-    let parse_time = now.elapsed().as_millis();
-
-    let mut map: HashMap<String, Value> = HashMap::new();
-
-    let now = Instant::now();
-    extract.iter().for_each(|extr| {
-        let selector_bind = &extr.selector.clone();
-        let selector = Selector::parse(selector_bind).unwrap();
-        let element = dom.select(&selector).next();
-        let val = match element {
-            Some(element) => {
-                // println!("matched element");
-                let extracted_value = match &extr.extract_type {
-                    ExtractType::Text => element.text().fold(String::from(""), |acc, s| acc + s).trim().to_owned(),
-                    ExtractType::Attribute(at) => element.value().attr(&at).unwrap().to_owned()
+    // println!("Reqwest retuned");
+    match response {
+        Ok(html) => {
+            let now = Instant::now();
+            let dom = Html::parse_document(&html).clone();
+            let parse_time = now.elapsed().as_millis();
+        
+            let mut map: HashMap<String, Value> = HashMap::new();
+        
+            let now = Instant::now();
+            extract.iter().for_each(|extr| {
+                let selector_bind = &extr.selector.clone();
+                let selector = Selector::parse(selector_bind).unwrap();
+                let element = dom.select(&selector).next();
+                let val = match element {
+                    Some(element) => {
+                        // println!("matched element");
+                        let extracted_value = match &extr.extract_type {
+                            ExtractType::Text => element.text().fold(String::from(""), |acc, s| acc + s).trim().to_owned(),
+                            ExtractType::Attribute(at) => element.value().attr(&at).unwrap().to_owned()
+                        };
+                        Some(extracted_value)
+                    },
+                    None => None
                 };
-                Some(extracted_value)
-            },
-            None => None
-        };
-        let insert_value = match val {
-            Some(string) => Value::String(string),
-            None => Value::Null,
-        };
-        map.insert(extr.field_name.clone(), insert_value);
-    });
-
-    let mapSize = map.len();
-
-    let value = serde_json::to_value(map).unwrap();
-    let extract_time = now.elapsed().as_millis();
-
-    let now = Instant::now();
-
-    // Should later convert to async string once figure out borrow checker
-    push_data(&vec![value]); 
-    //push_data_async(vec![value].clone()).await;
-    let push_time = now.elapsed().as_millis();
-
-    println!(
-        "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
-        mapSize,
-        extract.len(),
-        req.url,
-        request_time,
-        parse_time,
-        extract_time,
-        push_time
-    );
+                let insert_value = match val {
+                    Some(string) => Value::String(string),
+                    None => Value::Null,
+                };
+                map.insert(extr.field_name.clone(), insert_value);
+            });
+        
+            let mapSize = map.len();
+        
+            let value = serde_json::to_value(map).unwrap();
+            let extract_time = now.elapsed().as_millis();
+        
+            let now = Instant::now();
+        
+            // Should later convert to async string once figure out borrow checker
+            push_data(&vec![value]); 
+            //push_data_async(vec![value].clone()).await;
+            let push_time = now.elapsed().as_millis();
+        
+            println!(
+                "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
+                mapSize,
+                extract.len(),
+                req.url,
+                request_time,
+                parse_time,
+                extract_time,
+                push_time
+            );
+        },
+        Err(err) => {
+            println!(
+                "FAILURE({} - timings (in ms) - request: {} --- error: {}",
+                req.url,
+                request_time,
+                err
+            );
+        }
+    }
+    
 }

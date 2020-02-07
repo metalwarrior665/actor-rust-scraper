@@ -114,15 +114,15 @@ pub fn request_text(url: &str, proxy: &Option<Proxy>) -> String {
     }
 }
 
-pub async fn request_text_async(url: String, proxy: &Option<Proxy>) -> String {
-    println!("Doing reqwest");
+pub async fn request_text_async(url: String, proxy: &Option<Proxy>) -> Result<String, reqwest::Error>{
+    // println!("Doing reqwest");
     match proxy {
         Some(proxy) => {
             let client = reqwest::Client::builder()
-                .proxy(reqwest::Proxy::all(&proxy.base_url).unwrap().basic_auth(&proxy.username, &proxy.password))
-                .build().unwrap();
-            client.get(&url).send().await.unwrap().text().await.unwrap()
+                .proxy(reqwest::Proxy::all(&proxy.base_url)?.basic_auth(&proxy.username, &proxy.password))
+                .build()?;
+            Ok(client.get(&url).send().await?.text().await?)
         },
-        None => reqwest::get(&url).await.unwrap().text().await.unwrap()
+        None => Ok(reqwest::get(&url).await?.text().await?)
     }
 }
