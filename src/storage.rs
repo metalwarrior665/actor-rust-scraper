@@ -27,8 +27,28 @@ pub fn push_data (data: &Vec<Value>) {
         let default_dataset = env::var("APIFY_DEFAULT_DATASET_ID").unwrap();
         let token = env::var("APIFY_TOKEN").unwrap();
         let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", default_dataset, token);
-        let client = reqwest::Client::new();
+        let client = reqwest::blocking::Client::new();
         client.post(&url).body(json).header("Content-Type", "application/json").send().unwrap();
+    } else {
+        data.iter().enumerate().for_each(|(i, val)| {
+            let json = serde_json::to_string(&val).unwrap();
+            let key = create_indexed_key(i);
+            let path = format!("apify_storage/datasets/default/{}.json", key);
+            fs::write(path, json).unwrap();
+        });    
+    }
+}
+
+// I'm not using reference because trying to make borrow checker happy
+pub async fn push_data_async (data: Vec<Value>) {
+    let is_on_apify = get_is_on_apify();
+    if is_on_apify {
+        let json = serde_json::to_string(&data).unwrap();
+        let default_dataset = env::var("APIFY_DEFAULT_DATASET_ID").unwrap();
+        let token = env::var("APIFY_TOKEN").unwrap();
+        let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", default_dataset, token);
+        let client = reqwest::Client::new();
+        client.post(&url).body(json).header("Content-Type", "application/json").send().await.unwrap();
     } else {
         data.iter().enumerate().for_each(|(i, val)| {
             let json = serde_json::to_string(&val).unwrap();
@@ -59,7 +79,7 @@ pub fn set_value (key: &str, value: &Vec<Value>) {
         let default_kv = env::var("APIFY_DEFAULT_KEY_VALUE_STORE_ID").unwrap();
         let token = env::var("APIFY_TOKEN").unwrap();
         let url = format!("https://api.apify.com/v2/key-value-stores/{}/records/{}?token={}", default_kv, key, token);
-        let client = reqwest::Client::new();
+        let client = reqwest::blocking::Client::new();
         client.put(&url).body(json).header("Content-Type", "application/json").send().unwrap();
     } else {
         fs::write("apify_storage/key_value_stores/default/OUTPUT.JSON", json).unwrap();
@@ -67,14 +87,28 @@ pub fn set_value (key: &str, value: &Vec<Value>) {
     
 }
 
+// TODO: We should reuse connection pool for perf - see https://docs.rs/reqwest/0.10.1/reqwest/index.html
 pub fn request_text(url: &str, proxy: &Option<Proxy>) -> String {
+    match proxy {
+        Some(proxy) => {
+            let client = reqwest::blocking::Client::builder()
+                .proxy(reqwest::Proxy::all(&proxy.base_url).unwrap().basic_auth(&proxy.username, &proxy.password))
+                .build().unwrap();
+            client.get(url).send().unwrap().text().unwrap()
+        },
+        None => reqwest::blocking::get(url).unwrap().text().unwrap()
+    }
+}
+
+pub async fn request_text_async(url: String, proxy: &Option<Proxy>) -> String {
+    println!("Doing reqwest");
     match proxy {
         Some(proxy) => {
             let client = reqwest::Client::builder()
                 .proxy(reqwest::Proxy::all(&proxy.base_url).unwrap().basic_auth(&proxy.username, &proxy.password))
                 .build().unwrap();
-            client.get(url).send().unwrap().text().unwrap()
+            client.get(&url).send().await.unwrap().text().await.unwrap()
         },
-        None => reqwest::get(url).unwrap().text().unwrap()
+        None => reqwest::get(&url).await.unwrap().text().await.unwrap()
     }
 }

@@ -10,6 +10,9 @@ use std::time::{Instant};
 use std::clone::Clone;
 use std::collections::HashMap;
 
+use async_std::prelude::*;
+use async_std::task;
+
 use scraper::{Selector, Html};
 use serde_json::{Value};
 
@@ -24,7 +27,7 @@ use request::Request;
 use requestlist::RequestList;
 use crate::crawler::Crawler;
 use input::{Input, Extract, ExtractType, ProxySettings};
-use storage::{get_value, push_data, request_text};
+use storage::{get_value, push_data, push_data_async, request_text, request_text_async};
 use proxy::{get_apify_proxy};
 
 fn main() {
@@ -35,10 +38,17 @@ fn main() {
 
     let req_list = RequestList::new(sources);
 
-    let crwl = Crawler::new(req_list, input.extract, input.proxy_settings);
+    let crwl  = Crawler::new(req_list, input.extract, input.proxy_settings);
 
-    println!("STATUS --- Starting Crawler");
-    crwl.run(extract_data_from_url);
+    if input.run_async {
+        println!("STATUS --- Starting Async Crawler");
+        task::block_on(async {
+            crwl.run_async().await;
+        })
+    } else {
+        println!("STATUS --- Starting Sync Crawler");
+        crwl.run(extract_data_from_url);
+    }
 }
 
 fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: &Option<ProxySettings>) {
@@ -46,11 +56,11 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: 
 
     let now = Instant::now();
     let html = request_text(&req.url, &proxy_url);
-    let requestTime = now.elapsed().as_millis();
+    let request_time = now.elapsed().as_millis();
 
     let now = Instant::now();
     let dom = Html::parse_document(&html);
-    let parseTime = now.elapsed().as_millis();
+    let parse_time = now.elapsed().as_millis();
 
     let mut map: HashMap<String, Value> = HashMap::new();
 
@@ -84,16 +94,80 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: 
 
     let now = Instant::now();
     push_data(&vec![value]);
-    let pushTime = now.elapsed().as_millis();
+    let push_time = now.elapsed().as_millis();
 
     println!(
         "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
         mapSize,
         extract.len(),
         &req.url,
-        requestTime,
-        parseTime,
+        request_time,
+        parse_time,
         extractTime,
-        pushTime
+        push_time
+    );
+}
+
+async fn extract_data_from_url_async(req: Request, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>) {
+    println!("started async extraction");
+    let proxy_url = get_apify_proxy(&proxy_settings);
+
+    let now = Instant::now();
+    let url = req.url.clone();
+    let html = request_text_async(url, &proxy_url).await;
+    let request_time = now.elapsed().as_millis();
+
+    println!("Reqwest retuned");
+
+    let now = Instant::now();
+    let dom = Html::parse_document(&html).clone();
+    let parse_time = now.elapsed().as_millis();
+
+    let mut map: HashMap<String, Value> = HashMap::new();
+
+    let now = Instant::now();
+    extract.iter().for_each(|extr| {
+        let selector_bind = &extr.selector.clone();
+        let selector = Selector::parse(selector_bind).unwrap();
+        let element = dom.select(&selector).next();
+        let val = match element {
+            Some(element) => {
+                // println!("matched element");
+                let extracted_value = match &extr.extract_type {
+                    ExtractType::Text => element.text().fold(String::from(""), |acc, s| acc + s).trim().to_owned(),
+                    ExtractType::Attribute(at) => element.value().attr(&at).unwrap().to_owned()
+                };
+                Some(extracted_value)
+            },
+            None => None
+        };
+        let insert_value = match val {
+            Some(string) => Value::String(string),
+            None => Value::Null,
+        };
+        map.insert(extr.field_name.clone(), insert_value);
+    });
+
+    let mapSize = map.len();
+
+    let value = serde_json::to_value(map).unwrap();
+    let extract_time = now.elapsed().as_millis();
+
+    let now = Instant::now();
+
+    // Should later convert to async string once figure out borrow checker
+    push_data(&vec![value]); 
+    //push_data_async(vec![value].clone()).await;
+    let push_time = now.elapsed().as_millis();
+
+    println!(
+        "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
+        mapSize,
+        extract.len(),
+        req.url,
+        request_time,
+        parse_time,
+        extract_time,
+        push_time
     );
 }

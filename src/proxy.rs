@@ -1,7 +1,7 @@
 use crate::input::ProxySettings;
 use std::env;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Proxy {
     pub base_url: String,
     pub username: String,
