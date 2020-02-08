@@ -41,6 +41,7 @@ pub fn push_data (data: Vec<Value>, client: &reqwest::blocking::Client) {
 
 // I'm not using reference because trying to make borrow checker happy
 pub async fn push_data_async (data: Vec<Value>, client: &reqwest::Client) {
+    println!("Pushing data");
     let is_on_apify = get_is_on_apify();
     if is_on_apify {
         let json = serde_json::to_string(&data).unwrap();
@@ -56,6 +57,7 @@ pub async fn push_data_async (data: Vec<Value>, client: &reqwest::Client) {
             fs::write(path, json).unwrap();
         });    
     }
+    println!("Pushed data");
 }
 
 pub fn get_value (key: &str) -> Input {

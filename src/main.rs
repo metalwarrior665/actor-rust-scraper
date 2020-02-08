@@ -182,8 +182,10 @@ async fn extract_data_from_url_async(
             let vec_len = locked_vec.len();
             println!("Push data buffer length:{}", vec_len);
             if vec_len >= push_data_size {
+                println!("Flushing data buffer length");
                 push_data_async(locked_vec.clone(), &client).await; 
                 locked_vec.truncate(0);
+                println!("Flushed data buffer length");
             } else {
                 locked_vec.push(value);
             }
