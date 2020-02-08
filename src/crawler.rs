@@ -13,43 +13,48 @@ pub struct Crawler {
     request_list: RequestList,
     extract: Vec<Extract>,
     client: reqwest::Client,
-    blocking_client: reqwest::blocking::Client
+    proxy_client: reqwest::Client,
+    blocking_client: reqwest::blocking::Client,
+    proxy_blocking_client: reqwest::blocking::Client
 }
 
 impl Crawler {
     pub fn new(request_list: RequestList, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>) -> Crawler {
+        let client = reqwest::Client::builder().build().unwrap();
+        let blocking_client = reqwest::blocking::Client::builder().build().unwrap();
+
         let proxy = get_apify_proxy(&proxy_settings);
-        let (client, blocking_client) = match proxy {
+        let (proxy_client, proxy_blocking_client) = match proxy {
             Some(proxy) => {
-                let client = reqwest::Client::builder()
+                let proxy_client = reqwest::Client::builder()
                     .proxy(reqwest::Proxy::all(&proxy.base_url).unwrap().basic_auth(&proxy.username, &proxy.password))
                     .build().unwrap();
 
-                let blocking_client = reqwest::blocking::Client::builder()
+                let proxy_blocking_client = reqwest::blocking::Client::builder()
                     .proxy(reqwest::Proxy::all(&proxy.base_url).unwrap().basic_auth(&proxy.username, &proxy.password))
                     .build().unwrap();
-                (client, blocking_client)
+                (proxy_client, proxy_blocking_client)
             },
             None => {
-                let client = reqwest::Client::builder() .build().unwrap();
-                let blocking_client = reqwest::blocking::Client::builder().build().unwrap();
-                (client, blocking_client)
+                (client.clone(), blocking_client.clone())
             }
         };
         Crawler {
             request_list,
             extract,
             client,
-            blocking_client
+            proxy_client,
+            blocking_client,
+            proxy_blocking_client
         }
     }
     
     pub fn run(&self) {
-        self.request_list.sources.par_iter().for_each(|req| extract_data_from_url(req, &self.extract, &self.blocking_client));
+        self.request_list.sources.par_iter().for_each(|req| extract_data_from_url(req, &self.extract, &self.blocking_client, &self.proxy_blocking_client));
     }   
 
     pub async fn run_async(self) { 
-        let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(req.clone(), self.extract.clone(), self.client.clone()));
+        let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(req.clone(), &self.extract, &self.client, &self.proxy_client));
         // std_async style
         // let tasks = futures.map(|fut| task::spawn(fut));
 

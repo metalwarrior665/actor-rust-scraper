@@ -67,9 +67,9 @@ async fn main() {
     }
 }
 
-fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest::blocking::Client) {
+fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest::blocking::Client, proxy_client: &reqwest::blocking::Client) {
     let now = Instant::now();
-    let html = request_text(&req.url, &client);
+    let html = request_text(&req.url, &proxy_client);
     let request_time = now.elapsed().as_millis();
 
     let now = Instant::now();
@@ -107,7 +107,7 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest
     let extractTime = now.elapsed().as_millis();
 
     let now = Instant::now();
-    push_data(&vec![value]);
+    push_data(vec![value], &client);
     let push_time = now.elapsed().as_millis();
 
     println!(
@@ -122,12 +122,12 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest
     );
 }
 
-async fn extract_data_from_url_async(req: Request, extract: Vec<Extract>, client: reqwest::Client) {
+async fn extract_data_from_url_async(req: Request, extract: &Vec<Extract>, client: &reqwest::Client, proxy_client: &reqwest::Client) {
     // println!("started async extraction");
 
     let now = Instant::now();
     let url = req.url.clone();
-    let response = request_text_async(url, &client).await;
+    let response = request_text_async(url, &proxy_client).await;
     let request_time = now.elapsed().as_millis();
 
     // println!("Reqwest retuned");

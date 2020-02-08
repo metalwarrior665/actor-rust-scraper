@@ -20,7 +20,7 @@ fn create_indexed_key (index: usize) -> String {
     key
 }
 
-pub fn push_data (data: &Vec<Value>) {
+pub fn push_data (data: Vec<Value>, client: &reqwest::blocking::Client) {
     let is_on_apify = get_is_on_apify();
     if is_on_apify {
         let json = serde_json::to_string(&data).unwrap();
