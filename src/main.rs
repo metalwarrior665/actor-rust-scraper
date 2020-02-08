@@ -63,15 +63,13 @@ async fn main() {
         // })
     } else {
         println!("STATUS --- Starting Sync Crawler");
-        crwl.run(extract_data_from_url);
+        crwl.run();
     }
 }
 
-fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: &Option<ProxySettings>) {
-    let proxy_url = get_apify_proxy(&proxy_settings);
-
+fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest::blocking::Client) {
     let now = Instant::now();
-    let html = request_text(&req.url, &proxy_url);
+    let html = request_text(&req.url, &client);
     let request_time = now.elapsed().as_millis();
 
     let now = Instant::now();
@@ -124,13 +122,12 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, proxy_settings: 
     );
 }
 
-async fn extract_data_from_url_async(req: Request, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>) {
+async fn extract_data_from_url_async(req: Request, extract: Vec<Extract>, client: reqwest::Client) {
     // println!("started async extraction");
-    let proxy_url = get_apify_proxy(&proxy_settings);
 
     let now = Instant::now();
     let url = req.url.clone();
-    let response = request_text_async(url, &proxy_url).await;
+    let response = request_text_async(url, &client).await;
     let request_time = now.elapsed().as_millis();
 
     // println!("Reqwest retuned");

@@ -66,7 +66,8 @@ pub fn get_value (key: &str) -> Input {
         let default_kv = env::var("APIFY_DEFAULT_KEY_VALUE_STORE_ID").unwrap();
         println!("Default KV -> {}", default_kv);
         let url = format!("https://api.apify.com/v2/key-value-stores/{}/records/{}", default_kv, key);
-        let val = request_text(&url, &None);
+        let client = reqwest::blocking::Client::builder().build().unwrap();
+        let val = request_text(&url, &client);
         println!("Loaded value from KV -> {}", val);
         val
     } else {
@@ -102,27 +103,10 @@ pub fn set_value (key: &str, value: &Vec<Value>) {
 }
 
 // TODO: We should reuse connection pool for perf - see https://docs.rs/reqwest/0.10.1/reqwest/index.html
-pub fn request_text(url: &str, proxy: &Option<Proxy>) -> String {
-    match proxy {
-        Some(proxy) => {
-            let client = reqwest::blocking::Client::builder()
-                .proxy(reqwest::Proxy::all(&proxy.base_url).unwrap().basic_auth(&proxy.username, &proxy.password))
-                .build().unwrap();
-            client.get(url).send().unwrap().text().unwrap()
-        },
-        None => reqwest::blocking::get(url).unwrap().text().unwrap()
-    }
+pub fn request_text(url: &str, client: &reqwest::blocking::Client) -> String {
+    client.get(url).send().unwrap().text().unwrap()
 }
 
-pub async fn request_text_async(url: String, proxy: &Option<Proxy>) -> Result<String, reqwest::Error>{
-    // println!("Doing reqwest");
-    match proxy {
-        Some(proxy) => {
-            let client = reqwest::Client::builder()
-                .proxy(reqwest::Proxy::all(&proxy.base_url)?.basic_auth(&proxy.username, &proxy.password))
-                .build()?;
-            Ok(client.get(&url).send().await?.text().await?)
-        },
-        None => Ok(reqwest::get(&url).await?.text().await?)
-    }
+pub async fn request_text_async(url: String, client: &reqwest::Client) -> Result<String, reqwest::Error>{
+    Ok(client.get(&url).send().await?.text().await?) 
 }
