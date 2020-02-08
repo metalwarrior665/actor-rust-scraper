@@ -170,7 +170,7 @@ async fn extract_data_from_url_async(req: Request, extract: Vec<Extract>, client
             let now = Instant::now();
         
             // Should later convert to async string once figure out borrow checker
-            push_data(&vec![value]); 
+            push_data_async(vec![value], &client).await; 
             //push_data_async(vec![value].clone()).await;
             let push_time = now.elapsed().as_millis();
         

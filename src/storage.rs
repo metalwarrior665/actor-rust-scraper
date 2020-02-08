@@ -40,14 +40,13 @@ pub fn push_data (data: &Vec<Value>) {
 }
 
 // I'm not using reference because trying to make borrow checker happy
-pub async fn push_data_async (data: Vec<Value>) {
+pub async fn push_data_async (data: Vec<Value>, client: &reqwest::Client) {
     let is_on_apify = get_is_on_apify();
     if is_on_apify {
         let json = serde_json::to_string(&data).unwrap();
         let default_dataset = env::var("APIFY_DEFAULT_DATASET_ID").unwrap();
         let token = env::var("APIFY_TOKEN").unwrap();
         let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", default_dataset, token);
-        let client = reqwest::Client::new();
         client.post(&url).body(json).header("Content-Type", "application/json").send().await.unwrap();
     } else {
         data.iter().enumerate().for_each(|(i, val)| {
