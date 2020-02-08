@@ -3,6 +3,9 @@ use crate::request::Request;
 use crate::input::{Extract, ProxySettings};
 use crate::{extract_data_from_url_async,extract_data_from_url};
 use crate::proxy:: {get_apify_proxy};
+use crate::storage:: {push_data_async};
+
+use std::sync::{Arc, Mutex};
 
 use async_std::task;
 // use async_std::prelude::Future;
@@ -12,6 +15,8 @@ use rayon::prelude::*;
 pub struct Crawler {
     request_list: RequestList,
     extract: Vec<Extract>,
+    push_data_size: usize,
+    push_data_buffer: Arc<Mutex<Vec<serde_json::Value>>>,
     client: reqwest::Client,
     proxy_client: reqwest::Client,
     blocking_client: reqwest::blocking::Client,
@@ -19,7 +24,7 @@ pub struct Crawler {
 }
 
 impl Crawler {
-    pub fn new(request_list: RequestList, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>) -> Crawler {
+    pub fn new(request_list: RequestList, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>, push_data_size: usize) -> Crawler {
         let client = reqwest::Client::builder().build().unwrap();
         let blocking_client = reqwest::blocking::Client::builder().build().unwrap();
 
@@ -42,6 +47,8 @@ impl Crawler {
         Crawler {
             request_list,
             extract,
+            push_data_size,
+            push_data_buffer: Arc::new(Mutex::new(Vec::with_capacity(push_data_size))),
             client,
             proxy_client,
             blocking_client,
@@ -54,27 +61,14 @@ impl Crawler {
     }   
 
     pub async fn run_async(self) { 
-        let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(req.clone(), &self.extract, &self.client, &self.proxy_client));
-        // std_async style
-        // let tasks = futures.map(|fut| task::spawn(fut));
-
+        let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(req.clone(), &self.extract, &self.client, &self.proxy_client, self.push_data_size, self.push_data_buffer.clone()));
+        
         let fut = futures::future::join_all(futures.into_iter()).await;
 
-        // tokio::spawn(fut).await;
-        // tokio style
-        // let tasks = futures.map(|fut| tokio::spawn(fut));
+        // After we are done looping, we need to flush the push_data_buffer one last time
+        let locked_vec = self.push_data_buffer.lock().unwrap();
 
-        // futures::future::join_all(tasks.into_iter()).await;
+        // TODO: We should not need to clone here
+        push_data_async(locked_vec.clone(), &self.client).await; 
     } 
-
-    // Was naively trying to pass async function in
-    /*
-    pub async fn run_async<F>(&self, f: impl Fn(&Request, &Vec<Extract>, &Option<ProxySettings>) -> F)
-    where F: Future {
-        let tasks = self.request_list.sources.iter().map(|req| task::spawn(async {
-            println!("Spawning task");
-            f(req, &self.extract, &self.proxy_settings).await;
-        }));
-    } 
-    */
 }

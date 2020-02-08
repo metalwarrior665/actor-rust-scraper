@@ -6,7 +6,8 @@ pub struct Input {
     pub urls: Vec<Request>,
     pub extract: Vec<Extract>,
     pub proxy_settings: Option<ProxySettings>,
-    pub run_async: bool
+    pub run_async: bool,
+    pub push_data_size: usize
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

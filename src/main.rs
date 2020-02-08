@@ -12,6 +12,7 @@ use std::time::{Instant};
 use std::clone::Clone;
 use std::collections::HashMap;
 
+use std::sync::{Arc, Mutex};
 // use async_std::prelude::*;
 use async_std::task;
 
@@ -53,7 +54,7 @@ async fn main() {
 
     let req_list = RequestList::new(sources);
 
-    let crwl  = Crawler::new(req_list, input.extract, input.proxy_settings);
+    let crwl  = Crawler::new(req_list, input.extract, input.proxy_settings, input.push_data_size);
 
     if input.run_async {
         println!("STATUS --- Starting Async Crawler");
@@ -122,7 +123,15 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest
     );
 }
 
-async fn extract_data_from_url_async(req: Request, extract: &Vec<Extract>, client: &reqwest::Client, proxy_client: &reqwest::Client) {
+async fn extract_data_from_url_async(
+        req: Request,
+        extract: &Vec<Extract>,
+        client: &reqwest::Client,
+        proxy_client: &reqwest::Client,
+        push_data_size: usize,
+        push_data_buffer: Arc<Mutex<Vec<serde_json::Value>>>
+        ) 
+    {
     // println!("started async extraction");
 
     let now = Instant::now();
@@ -169,8 +178,18 @@ async fn extract_data_from_url_async(req: Request, extract: &Vec<Extract>, clien
         
             let now = Instant::now();
         
-            // Should later convert to async string once figure out borrow checker
-            push_data_async(vec![value], &client).await; 
+            let mut locked_vec = push_data_buffer.lock().unwrap();
+            let vec_len = locked_vec.len();
+            println!("Push data buffer length:{}", vec_len);
+            if vec_len >= push_data_size {
+                push_data_async(locked_vec.clone(), &client).await; 
+                locked_vec.truncate(0);
+            } else {
+                locked_vec.push(value);
+            }
+
+            std::mem::drop(locked_vec);
+            
             //push_data_async(vec![value].clone()).await;
             let push_time = now.elapsed().as_millis();
         
