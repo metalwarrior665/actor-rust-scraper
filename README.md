@@ -32,14 +32,14 @@ Rust is statically typed language compiled directly into machine code. Because o
 - This actor only works for scraping pure HTML websites (basically an alternative for [Cheerio Scraper](https://apify.com/apify/cheerio-scraper))
 - You can only provide static list of URLs, it cannot enqueue any more.
 - It doesn't have a page function, only simplified interface (`extract` object) to define what should be scraped.
-- It cannot retry retry failed requests (they return `null` for the failed attributes)
+- It cannot retry failed requests (they return `null` for the failed attributes)
 - It doesn't manage concurrency at all. So you cannot set max concurrency and the async mode may easily blow up the memory on large start URLs set.
 
 ### Input
-Input in a JSON object with these properties. You can also set it up on Apify platform with a nice UI.
+Input is a JSON object with the properties below. You can also set it up on Apify platform with a nice UI.
 - `startUrls` (array(object)) Array of [request objects](https://sdk.apify.com/docs/api/request#docsNav). At the simplest level a request object looks like this: `{ "url": "http://example.com" }`
 - `run_async` (boolean) Asynchronous scraping is much faster but has much higher memory usage and can even run out of it and crash. Fixes and optimizations are planned in future versions
-- `push_data_size` (number) Buffers results into vector (array) before pushing to a dataset. This prevents overwhelming Apify API. We recommend setting this to at least few thousands.
+- `push_data_size` (number) Buffers results into a vector (growable array) before pushing them to a dataset. This prevents overwhelming Apify API. We recommend setting this to at least few thousands.
 - `debug_log` (boolean) Shows when each URL starts and ends scraping with timings. Don't use for larger fast runs.
 - `proxy_settings` (object) Proxy configuration of the actor. By default it uses automatic proxy but you can set it to `None` by passing `{ useApifyProxy: false }`.
 - `extact` (object) Extraction config. This will determine how and what data will be extracted. Check [Data extraction](#data-extraction)
