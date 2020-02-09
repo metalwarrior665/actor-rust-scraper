@@ -12,7 +12,7 @@ use std::time::{Instant};
 use std::clone::Clone;
 use std::collections::HashMap;
 
-use std::sync::{ Arc};
+use std::sync::{ Arc };
 use futures::lock::{Mutex};
 // use async_std::prelude::*;
 use async_std::task;
@@ -55,7 +55,7 @@ async fn main() {
 
     let req_list = RequestList::new(sources);
 
-    let crwl  = Crawler::new(req_list, input.extract, input.proxy_settings, input.push_data_size, input.force_cloud);
+    let crwl  = Crawler::new(req_list, input.extract, input.proxy_settings, input.push_data_size, input.force_cloud, input.debug_log);
 
     if input.run_async {
         println!("STATUS --- Starting Async Crawler");
@@ -69,9 +69,23 @@ async fn main() {
     }
 }
 
-fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest::blocking::Client, proxy_client: &reqwest::blocking::Client) {
+fn extract_data_from_url(
+    req: &Request,
+    extract: &Vec<Extract>,
+    client: &reqwest::blocking::Client,
+    proxy_client: &reqwest::blocking::Client,
+    push_data_size: usize,
+    push_data_buffer: Arc<std::sync::Mutex<Vec<serde_json::Value>>>,
+    force_cloud: bool,
+    debug_log: bool
+) {
+    let url = &req.url;
+    if debug_log {
+        println!("Started sync extraction --- {}", url);
+    }
+    
     let now = Instant::now();
-    let html = request_text(&req.url, &proxy_client);
+    let html = request_text(&url, &proxy_client);
     let request_time = now.elapsed().as_millis();
 
     let now = Instant::now();
@@ -109,19 +123,34 @@ fn extract_data_from_url(req: &Request, extract: &Vec<Extract>, client: &reqwest
     let extractTime = now.elapsed().as_millis();
 
     let now = Instant::now();
-    push_data(vec![value], &client);
+    {
+        let mut locked_vec = push_data_buffer.lock().unwrap();
+        locked_vec.push(value);
+        let vec_len = locked_vec.len();
+        if debug_log {
+            println!("Push data buffer length:{}", vec_len);
+        }
+        if vec_len >= push_data_size {
+            println!("Flushing data buffer --- length: {}", locked_vec.len());
+            push_data(locked_vec.clone(), &client, force_cloud); 
+            locked_vec.truncate(0);
+            println!("Flushed data buffer --- length: {}", locked_vec.len());
+        }
+    }
     let push_time = now.elapsed().as_millis();
 
-    println!(
-        "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
-        mapSize,
-        extract.len(),
-        &req.url,
-        request_time,
-        parse_time,
-        extractTime,
-        push_time
-    );
+    if debug_log {
+        println!(
+            "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
+            mapSize,
+            extract.len(),
+            &req.url,
+            request_time,
+            parse_time,
+            extractTime,
+            push_time
+        );
+    }
 }
 
 async fn extract_data_from_url_async(
@@ -130,14 +159,17 @@ async fn extract_data_from_url_async(
         client: &reqwest::Client,
         proxy_client: &reqwest::Client,
         push_data_size: usize,
-        push_data_buffer: Arc<Mutex<Vec<serde_json::Value>>>,
-        force_cloud: bool
-        ) 
-    {
-    // println!("started async extraction");
+        push_data_buffer: Arc<futures::lock::Mutex<Vec<serde_json::Value>>>,
+        force_cloud: bool,
+        debug_log: bool
+) {
+
+    let url = req.url.clone();
+    if debug_log {
+        println!("Started async extraction --- {}", url);
+    }
 
     let now = Instant::now();
-    let url = req.url.clone();
     let response = request_text_async(url, &proxy_client).await;
     let request_time = now.elapsed().as_millis();
 
@@ -182,38 +214,40 @@ async fn extract_data_from_url_async(
         
             {
                 let mut locked_vec = push_data_buffer.lock().await;
+                locked_vec.push(value);
                 let vec_len = locked_vec.len();
-                println!("Push data buffer length:{}", vec_len);
+                if debug_log {
+                    println!("Push  data buffer length:{}", vec_len);
+                }
                 if vec_len >= push_data_size {
-                    println!("Flushing data buffer length");
+                    println!("Flushing data buffer --- length: {}", locked_vec.len());
                     push_data_async(locked_vec.clone(), &client, force_cloud).await; 
                     locked_vec.truncate(0);
-                    println!("Flushed data buffer length");
-                } else {
-                    locked_vec.push(value);
+                    println!("Flushed data buffer --- length: {}", locked_vec.len());
                 }
             }
             
-            //push_data_async(vec![value].clone()).await;
             let push_time = now.elapsed().as_millis();
         
-            println!(
-                "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
-                mapSize,
-                extract.len(),
-                req.url,
-                request_time,
-                parse_time,
-                extract_time,
-                push_time
-            );
+            if debug_log {
+                println!(
+                    "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
+                    mapSize,
+                    extract.len(),
+                    req.url,
+                    request_time,
+                    parse_time,
+                    extract_time,
+                    push_time
+                );
+            }
         },
         Err(err) => {
             println!(
-                "FAILURE({} - timings (in ms) - request: {} --- error: {}",
-                req.url,
+                "FAILURE({} - timings (in ms) - request: {} --- {}",
+                err,
                 request_time,
-                err
+                req.url,
             );
         }
     }
