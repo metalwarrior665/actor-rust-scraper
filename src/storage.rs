@@ -40,7 +40,7 @@ pub fn push_data (data: Vec<Value>, client: &reqwest::blocking::Client) {
 }
 
 // I'm not using reference because trying to make borrow checker happy
-pub async fn push_data_async (data: Vec<Value>, client: &reqwest::Client) {
+pub async fn push_data_async (data: Vec<Value>, client: &reqwest::Client, force_cloud: bool) {
     println!("Pushing data");
     let is_on_apify = get_is_on_apify();
     if is_on_apify {
@@ -49,6 +49,14 @@ pub async fn push_data_async (data: Vec<Value>, client: &reqwest::Client) {
         let token = env::var("APIFY_TOKEN").unwrap();
         let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", default_dataset, token);
         client.post(&url).body(json).header("Content-Type", "application/json").send().await.unwrap();
+    } else if force_cloud {
+        let json = serde_json::to_string(&data).unwrap();
+        let cloud_test_dataset = "w7xbAHYhyoz3v8K8r";
+        let token = env::var("APIFY_TOKEN").unwrap();
+        let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", cloud_test_dataset, token);
+        println!("Before call, sending: {}", json);
+        client.post(&url).body(json).header("Content-Type", "application/json").send().await.unwrap();
+        println!("After call");
     } else {
         data.iter().enumerate().for_each(|(i, val)| {
             let json = serde_json::to_string(&val).unwrap();

@@ -5,7 +5,9 @@ use crate::{extract_data_from_url_async,extract_data_from_url};
 use crate::proxy:: {get_apify_proxy};
 use crate::storage:: {push_data_async};
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
+
+use futures::lock::{Mutex};
 
 use async_std::task;
 // use async_std::prelude::Future;
@@ -15,6 +17,7 @@ use rayon::prelude::*;
 pub struct Crawler {
     request_list: RequestList,
     extract: Vec<Extract>,
+    force_cloud: bool,
     push_data_size: usize,
     push_data_buffer: Arc<Mutex<Vec<serde_json::Value>>>,
     client: reqwest::Client,
@@ -24,7 +27,7 @@ pub struct Crawler {
 }
 
 impl Crawler {
-    pub fn new(request_list: RequestList, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>, push_data_size: usize) -> Crawler {
+    pub fn new(request_list: RequestList, extract: Vec<Extract>, proxy_settings: Option<ProxySettings>, push_data_size: usize, force_cloud: bool) -> Crawler {
         let client = reqwest::Client::builder().build().unwrap();
         let blocking_client = reqwest::blocking::Client::builder().build().unwrap();
 
@@ -47,6 +50,7 @@ impl Crawler {
         Crawler {
             request_list,
             extract,
+            force_cloud,
             push_data_size,
             push_data_buffer: Arc::new(Mutex::new(Vec::with_capacity(push_data_size))),
             client,
@@ -61,14 +65,14 @@ impl Crawler {
     }   
 
     pub async fn run_async(self) { 
-        let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(req.clone(), &self.extract, &self.client, &self.proxy_client, self.push_data_size, self.push_data_buffer.clone()));
+        let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(req.clone(), &self.extract, &self.client, &self.proxy_client, self.push_data_size, self.push_data_buffer.clone(), self.force_cloud));
         
         let fut = futures::future::join_all(futures.into_iter()).await;
 
         // After we are done looping, we need to flush the push_data_buffer one last time
-        let locked_vec = self.push_data_buffer.lock().unwrap();
+        let locked_vec = self.push_data_buffer.lock().await;
 
         // TODO: We should not need to clone here
-        push_data_async(locked_vec.clone(), &self.client).await; 
+        push_data_async(locked_vec.clone(), &self.client, self.force_cloud).await; 
     } 
 }

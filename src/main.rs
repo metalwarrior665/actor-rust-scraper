@@ -12,7 +12,8 @@ use std::time::{Instant};
 use std::clone::Clone;
 use std::collections::HashMap;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{ Arc};
+use futures::lock::{Mutex};
 // use async_std::prelude::*;
 use async_std::task;
 
@@ -54,7 +55,7 @@ async fn main() {
 
     let req_list = RequestList::new(sources);
 
-    let crwl  = Crawler::new(req_list, input.extract, input.proxy_settings, input.push_data_size);
+    let crwl  = Crawler::new(req_list, input.extract, input.proxy_settings, input.push_data_size, input.force_cloud);
 
     if input.run_async {
         println!("STATUS --- Starting Async Crawler");
@@ -129,7 +130,8 @@ async fn extract_data_from_url_async(
         client: &reqwest::Client,
         proxy_client: &reqwest::Client,
         push_data_size: usize,
-        push_data_buffer: Arc<Mutex<Vec<serde_json::Value>>>
+        push_data_buffer: Arc<Mutex<Vec<serde_json::Value>>>,
+        force_cloud: bool
         ) 
     {
     // println!("started async extraction");
@@ -178,19 +180,19 @@ async fn extract_data_from_url_async(
         
             let now = Instant::now();
         
-            let mut locked_vec = push_data_buffer.lock().unwrap();
-            let vec_len = locked_vec.len();
-            println!("Push data buffer length:{}", vec_len);
-            if vec_len >= push_data_size {
-                println!("Flushing data buffer length");
-                push_data_async(locked_vec.clone(), &client).await; 
-                locked_vec.truncate(0);
-                println!("Flushed data buffer length");
-            } else {
-                locked_vec.push(value);
+            {
+                let mut locked_vec = push_data_buffer.lock().await;
+                let vec_len = locked_vec.len();
+                println!("Push data buffer length:{}", vec_len);
+                if vec_len >= push_data_size {
+                    println!("Flushing data buffer length");
+                    push_data_async(locked_vec.clone(), &client, force_cloud).await; 
+                    locked_vec.truncate(0);
+                    println!("Flushed data buffer length");
+                } else {
+                    locked_vec.push(value);
+                }
             }
-
-            std::mem::drop(locked_vec);
             
             //push_data_async(vec![value].clone()).await;
             let push_time = now.elapsed().as_millis();

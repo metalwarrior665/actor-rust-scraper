@@ -7,6 +7,7 @@ pub struct Input {
     pub extract: Vec<Extract>,
     pub proxy_settings: Option<ProxySettings>,
     pub run_async: bool,
+    pub force_cloud: bool,
     pub push_data_size: usize
 }
 
