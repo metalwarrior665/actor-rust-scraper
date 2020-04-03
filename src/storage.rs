@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use serde_json::{from_str, Value};
 use crate::input::{Input};
-use crate::proxy::Proxy;
+use rand::Rng;
 
 pub fn get_is_on_apify() -> bool {
     match env::var("APIFY_IS_AT_HOME") {
@@ -18,30 +18,6 @@ fn create_indexed_key (index: usize) -> String {
         key = String::from("0") + &key;
     }
     key
-}
-
-pub fn push_data  (data: Vec<Value>, client: &reqwest::blocking::Client, force_cloud: bool) {
-    let is_on_apify = get_is_on_apify();
-    if is_on_apify {
-        let json = serde_json::to_string(&data).unwrap();
-        let default_dataset = env::var("APIFY_DEFAULT_DATASET_ID").unwrap();
-        let token = env::var("APIFY_TOKEN").unwrap();
-        let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", default_dataset, token);
-        client.post(&url).body(json).header("Content-Type", "application/json").send().unwrap();
-    } else if force_cloud {
-        let json = serde_json::to_string(&data).unwrap();
-        let cloud_test_dataset = "w7xbAHYhyoz3v8K8r";
-        let token = env::var("APIFY_TOKEN").unwrap();
-        let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", cloud_test_dataset, token);
-        client.post(&url).body(json).header("Content-Type", "application/json").send().unwrap();
-    } else {
-        data.iter().enumerate().for_each(|(i, val)| {
-            let json = serde_json::to_string(&val).unwrap();
-            let key = create_indexed_key(i);
-            let path = format!("apify_storage/datasets/default/{}.json", key);
-            fs::write(path, json).unwrap();
-        });    
-    }
 }
 
 // I'm not using reference because trying to make borrow checker happy
@@ -62,8 +38,8 @@ pub async fn push_data_async (data: Vec<Value>, client: &reqwest::Client, force_
     } else {
         data.iter().enumerate().for_each(|(i, val)| {
             let json = serde_json::to_string(&val).unwrap();
-            let key = create_indexed_key(i);
-            let path = format!("apify_storage/datasets/default/{}.json", key);
+            let mut rng = rand::thread_rng();
+            let path = format!("apify_storage/datasets/default/{}.json", rng.gen::<i32>());
             fs::write(path, json).unwrap();
         });    
     }

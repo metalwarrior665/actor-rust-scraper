@@ -6,10 +6,10 @@ pub struct Input {
     pub urls: Vec<Request>,
     pub extract: Vec<Extract>,
     pub proxy_settings: Option<ProxySettings>,
-    pub run_async: bool,
     pub force_cloud: bool,
     pub debug_log: bool,
-    pub push_data_size: usize
+    pub push_data_size: usize,
+    pub max_concurrency: usize
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -27,6 +27,7 @@ pub enum ExtractType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[allow(non_snake_case)]
 pub struct ProxySettings {
     pub useApifyProxy: bool,
     pub apifyProxyGroups: Option<Vec<String>>
