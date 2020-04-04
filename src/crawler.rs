@@ -112,7 +112,7 @@ impl Crawler {
                 // lock start
                 let mut locked_state = state.lock().await;
                 locked_state.in_progress.remove(&req.url);
-                println!("In progress count:{}", locked_state.in_progress.len());
+                // println!("In progress count:{}", locked_state.in_progress.len());
                 task_handle
                 // lock end
             });
