@@ -19,6 +19,13 @@
             "description": "Buffers results into vector (array) before pushing to a dataset. This prevents overwhelming Apify API.",
             "prefill": 500
         },
+        "max_concurrency": {
+            "title": "Max concurrency",
+            "type": "integer",
+            "description": "Sets the maximum concurrency (parallelism) for the crawl.",
+            "default": 100,
+            "minimum": 1
+        },
         "debug_log": {
             "title": "Debug log",
             "type": "boolean",
