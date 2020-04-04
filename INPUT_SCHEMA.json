@@ -13,17 +13,11 @@
             ],
             "editor": "requestListSources"
         },
-        "run_async": {
-            "title": "Async requests",
-            "type": "boolean",
-            "description": "Asynchronous scraping is much faster but can have unpredictable memory footprint or even crash. Fixes and optimizations are planned in future versions",
-            "default": false
-        },
         "push_data_size": {
             "title": "Push data buffer size",
             "type": "integer",
             "description": "Buffers results into vector (array) before pushing to a dataset. This prevents overwhelming Apify API.",
-            "prefill": 10000
+            "prefill": 500
         },
         "debug_log": {
             "title": "Debug log",

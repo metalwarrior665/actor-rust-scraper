@@ -50,11 +50,11 @@ pub fn get_value (key: &str) -> Input {
     println!("Is on Apify? -> {}", is_on_apify);
     let json = if is_on_apify {
         let default_kv = env::var("APIFY_DEFAULT_KEY_VALUE_STORE_ID").unwrap();
-        println!("Default KV -> {}", default_kv);
+        // println!("Default KV -> {}", default_kv);
         let url = format!("https://api.apify.com/v2/key-value-stores/{}/records/{}", default_kv, key);
         let client = reqwest::blocking::Client::builder().build().unwrap();
         let val = request_text(&url, &client);
-        println!("Loaded value from KV -> {}", val);
+        // println!("Loaded value from KV -> {}", val);
         val
     } else {
         fs::read_to_string("apify_storage/key_value_stores/default/INPUT.JSON").unwrap()
