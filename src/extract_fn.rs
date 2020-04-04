@@ -27,6 +27,14 @@ pub async fn extract_data_from_url(
         println!("Started extraction --- {}", url);
     }
 
+    // Random fail for testing errors
+    {
+        let mut rng = rand::thread_rng();
+        if rng.gen::<bool>() {
+            return Err(Box::new(CrawlerError::new(String::from("Testing error"))));
+        }
+    }
+
     let now = Instant::now();
     let html = request_text(&url, &proxy_client).await?;
     let request_time = now.elapsed().as_millis();
@@ -86,12 +94,6 @@ pub async fn extract_data_from_url(
             locked_vec.truncate(0);
             println!("Flushed data buffer --- length: {}", locked_vec.len());
         }
-    }
-
-    // Random fail for testing errors
-    let mut rng = rand::thread_rng();
-    if rng.gen::<bool>() {
-        return Err(Box::new(CrawlerError::new(String::from("Testing error"))));
     }
     
     let push_time = now.elapsed().as_millis();

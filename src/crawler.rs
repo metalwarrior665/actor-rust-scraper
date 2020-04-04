@@ -79,6 +79,8 @@ impl Crawler {
                 (locked_state.in_progress.len(), locked_state.reclaimed.len())
             };
 
+            // If there is any reclaimed one, we always pick,
+            // reclaimed is subset of in_progress so it should no go above max_concurrency
             if reclaimed_count == 0 && in_progress_count >= self.max_concurrency {
                 // println!("Max concurrency {} reached, waiting", self.max_concurrency);
                 tokio::time::delay_for(Duration::from_millis(10)).await;
@@ -161,7 +163,10 @@ impl Crawler {
                     }
                 } 
                 
-                // println!("In progress count:{}", locked_state.in_progress.len());
+                {
+                    let locked_state = state.lock().await;
+                    println!("In progress count:{}", locked_state.in_progress.len());
+                }
                 extract_data_result
             });
             task_handles.push(handle);
