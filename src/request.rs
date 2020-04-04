@@ -1,12 +1,13 @@
+// Immutable part of Request
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Request {
     // id: String,
     pub url: String,
-    // unique_key: String,
+    pub unique_key: String,
     // method: String,
     // payload: String,
     // retry: bool,
-    // retry_count: i32,
+    pub retry_count: usize,
     // error_messages: Vec<String>,
     // headers: HashMap<String, String>,
     // user_data: HashMap<String, String>,
@@ -16,7 +17,9 @@ pub struct Request {
 impl Request {
     pub fn new(url: String) -> Request {
         Request {
-            url
+            url: url.clone(),
+            unique_key: url,
+            retry_count: 0
         }
     }
 }

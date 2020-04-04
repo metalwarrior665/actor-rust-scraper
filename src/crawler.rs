@@ -1,8 +1,8 @@
 use crate::requestlist::RequestList;
 use crate::input::{Extract, ProxySettings};
-use crate::{extract_data_from_url_async};
+use crate::extract_fn::extract_data_from_url;
 use crate::proxy:: {get_apify_proxy};
-use crate::storage:: {push_data_async};
+use crate::storage:: {push_data};
 use crate::tokio;
 use std::time::Duration;
 
@@ -15,10 +15,10 @@ pub struct Crawler {
     debug_log: bool,
     push_data_size: usize,
     push_data_buffer: Arc<futures::lock::Mutex<Vec<serde_json::Value>>>,
-    push_data_buffer_sync: Arc<std::sync::Mutex<Vec<serde_json::Value>>>,
     client: reqwest::Client,
     proxy_client: reqwest::Client,
-    max_concurrency: usize
+    max_concurrency: usize,
+    max_request_retries: usize
 }
 
 impl Crawler {
@@ -53,38 +53,59 @@ impl Crawler {
             debug_log,
             push_data_size,
             push_data_buffer: Arc::new(futures::lock::Mutex::new(Vec::with_capacity(push_data_size))),
-            push_data_buffer_sync: Arc::new(std::sync::Mutex::new(Vec::with_capacity(push_data_size))),
             client,
             proxy_client,
-            max_concurrency
+            max_concurrency,
+            max_request_retries: 3 // hardcoded for now
         }
     }
 
-    pub async fn run_async(self) { 
+    pub async fn run(self) { 
         let mut task_handles = vec![];
 
-        // This is noly to keep copies for later
+        // This is only to keep copies for later
         let push_data_buffer_2 = self.push_data_buffer.clone();
         let client_2 = self.client.clone();
         let force_cloud = self.force_cloud;
 
         loop {
+            let debug_log = self.debug_log;
+            if debug_log {
+                // println!("Loop iteration start");
+            }
             // Check concurrency
-            let in_progress = {
+            let (in_progress_count, reclaimed_count) = {
                 let locked_state = self.request_list.state.lock().await;
-                locked_state.in_progress.len()
+                (locked_state.in_progress.len(), locked_state.reclaimed.len())
             };
 
-            if in_progress >= self.max_concurrency {
+            if reclaimed_count == 0 && in_progress_count >= self.max_concurrency {
                 // println!("Max concurrency {} reached, waiting", self.max_concurrency);
                 tokio::time::delay_for(Duration::from_millis(10)).await;
                 continue;
             }
 
+            // This req is immutable, only mutable via requests vec
             let req = match self.request_list.fetch_next_request().await {
-                None => break,
+                None => {
+                    // We still can have in_progress
+                    let in_progress_count;
+                    {
+                        let locked_state = self.request_list.state.lock().await;
+                        in_progress_count = locked_state.in_progress.len();
+                    }
+                    if in_progress_count > 0 {
+                        // println!("We still have some in-progress, waiting");
+                        tokio::time::delay_for(Duration::from_millis(10)).await;
+                        continue;
+                    } else {
+                        break;
+                    }
+                },
                 Some(req) => req
             };
+
+            // println!("Took new request: {:?}", req);
 
             let extract = self.extract.clone();
             let client = self.client.clone();
@@ -92,13 +113,15 @@ impl Crawler {
             let push_data_buffer = self.push_data_buffer.clone();
             let force_cloud = self.force_cloud;
             let push_data_size = self.push_data_size;
-            let debug_log = self.debug_log;
+            
+            let max_request_retries = self.max_request_retries;
 
             // Sending the state via Arc to a thread
-            let state = self.request_list.state.clone();
+            let state = Arc::clone(&self.request_list.state);
+            let unique_key_to_index = Arc::clone(&self.request_list.unique_key_to_index);
             
             let handle = tokio::task::spawn(async move {
-                let task_handle = extract_data_from_url_async(
+                let extract_data_result = extract_data_from_url(
                     req.clone(),
                     extract,
                     client,
@@ -109,12 +132,37 @@ impl Crawler {
                     debug_log,
                 ).await;
 
-                // lock start
-                let mut locked_state = state.lock().await;
-                locked_state.in_progress.remove(&req.url);
+                match extract_data_result {
+                    Ok(()) => {
+                        // mark_request_handled inlined here
+                        //if (debug_log) {
+                            println!("SUCCESS: Retry count: {}, URL: {}",
+                            req.retry_count, req.url); 
+                        //}
+                        let mut locked_state = state.lock().await;
+                        locked_state.in_progress.remove(&req.unique_key);
+                    },
+                    Err(ref e) if req.retry_count < max_request_retries => {
+                        // reclaim_request inlined here
+                        println!("ERROR: Reclaiming request! Retry count: {}, URL: {}, error: {}",
+                            req.retry_count, req.url, e);
+                        let index = *unique_key_to_index.get(&req.unique_key).unwrap();
+                        let mut locked_state = state.lock().await;
+                        locked_state.requests[index].retry_count += 1;
+                        locked_state.reclaimed.insert(req.unique_key);
+                    },
+                    Err(ref e) => {
+                        // mark_request_failed
+                        println!("ERROR: Max retries reached, marking failed! Retry count: {}, URL: {}, error: {}",
+                            req.retry_count, req.url, e);
+                        let mut locked_state = state.lock().await;
+                        locked_state.reclaimed.remove(&req.unique_key);
+                        locked_state.in_progress.remove(&req.unique_key);
+                    }
+                } 
+                
                 // println!("In progress count:{}", locked_state.in_progress.len());
-                task_handle
-                // lock end
+                extract_data_result
             });
             task_handles.push(handle);
         }
@@ -128,22 +176,6 @@ impl Crawler {
 
         // TODO: We should not need to clone here
         println!("Remaing Push data buffer length before last push:{}", locked_vec.len());
-        push_data_async(locked_vec.clone(), &client_2, force_cloud).await; 
+        push_data(locked_vec.clone(), &client_2, force_cloud).await.unwrap(); 
     } 
 }
-
-// First working solution for async
-/*
-let futures = self.request_list.sources.iter().map(|req| extract_data_from_url_async(
-    req.clone(),
-    &self.extract,
-    &self.client,
-    &self.proxy_client,
-    self.push_data_size,
-    self.push_data_buffer.clone(),
-    self.force_cloud,
-    self.debug_log
-));
-
-let fut = futures::future::join_all(futures.into_iter()).await;
-*/
