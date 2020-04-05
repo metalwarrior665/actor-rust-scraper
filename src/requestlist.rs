@@ -1,7 +1,9 @@
-use crate::request::Request;
 use futures::lock::{Mutex};
 use std::sync::{ Arc };
 use std::collections::{HashSet, HashMap};
+
+use crate::request::Request;
+use crate::input::SourceRequest;
 
 pub struct RequestListState {
     pub next_index: usize,
@@ -18,17 +20,23 @@ pub struct RequestList {
 
 // The implementation is very simplified verison of - https://github.com/apifytech/apify-js/blob/master/src/request_list.js 
 impl RequestList {
-    pub fn new(sources: Vec<Request>) -> RequestList {
+    pub fn new(sources: Vec<SourceRequest>) -> RequestList {
+        let mut requests: Vec<Request> = vec![];
         let mut unique_key_to_index = HashMap::with_capacity(sources.len());
-        for (i, req) in sources.iter().enumerate() {
-            unique_key_to_index.insert(req.unique_key.clone(), i);
+        for (i, req) in sources.into_iter().enumerate() {
+            let new_req = Request::new(req);
+            if !unique_key_to_index.contains_key(&new_req.unique_key) {
+                unique_key_to_index.insert(new_req.unique_key.clone(), i);
+                requests.push(new_req);
+            }
+            
         }
         let fresh_state = RequestListState {
             next_index: 0,
             // next_uniqueKey: sources[0].url.clone(),
             in_progress: HashSet::new(),
             reclaimed: HashSet::new(),
-            requests: sources,
+            requests,
         };
         RequestList {
             state: Arc::new(Mutex::new(fresh_state)),
@@ -47,6 +55,8 @@ impl RequestList {
         for unique_key in locked_state.reclaimed.iter().take(1) {
             maybe_reclaimed_key = Some(unique_key.clone());
         }
+
+        // let maybe_reclaimed_key = locked_state.reclaimed.iter().next();
 
         // If we found some reclaimed, we return that
         if let Some(unique_key) = maybe_reclaimed_key {

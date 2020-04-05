@@ -19,9 +19,8 @@ mod proxy;
 mod extract_fn;
 mod errors;
 
-use request::Request;
 use requestlist::RequestList;
-use crate::crawler::Crawler;
+use crate::crawler::{Crawler, CrawlerOptions};
 use input::{Input};
 use storage::{get_value}; 
 
@@ -32,15 +31,16 @@ async fn main() {
     let input: Input = get_value("INPUT").await.unwrap();
     println!("STATUS --- Loaded Input");
 
-    let sources = input.urls.iter().map(|req| Request::new(req.url.clone())).collect();
+    let sources = input.urls.clone();
 
     let req_list = RequestList::new(sources);
     println!("STATUS --- Initialized RequestList Input");
 
-    let crawler  = Crawler::new(req_list, input.extract, input.proxy_settings, input.push_data_size,
-        input.force_cloud, input.debug_log, input.max_concurrency);
+    let options: CrawlerOptions = input.to_options();
 
-    println!("STATUS --- Starting Async Crawler");
+    let crawler = Crawler::new(req_list, options);
+
+    println!("STATUS --- Starting Crawler");
     
     crawler.run().await;
 }

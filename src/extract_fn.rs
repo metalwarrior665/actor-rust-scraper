@@ -4,12 +4,12 @@ use std::sync::{ Arc };
 
 use scraper::{Selector, Html};
 use serde_json::{Value};
-use rand::Rng;
+// use rand::Rng;
 
 use crate::input::{Extract, ExtractType};
 use crate::storage::{ push_data, request_text};
 use crate::request::Request;
-use crate::errors::CrawlerError;
+// use crate::errors::CrawlerError;
 
 
 pub async fn extract_data_from_url(
@@ -17,7 +17,6 @@ pub async fn extract_data_from_url(
     extract: Vec<Extract>,
     client: reqwest::Client,
     proxy_client: reqwest::Client,
-    push_data_size: usize,
     push_data_buffer: Arc<futures::lock::Mutex<Vec<serde_json::Value>>>,
     force_cloud: bool,
     debug_log: bool
@@ -28,12 +27,14 @@ pub async fn extract_data_from_url(
     }
 
     // Random fail for testing errors
+    /*
     {
         let mut rng = rand::thread_rng();
         if rng.gen::<bool>() {
             return Err(Box::new(CrawlerError::new(String::from("Testing error"))));
         }
     }
+    */
 
     let now = Instant::now();
     let html = request_text(&url, &proxy_client).await?;
@@ -86,9 +87,9 @@ pub async fn extract_data_from_url(
         locked_vec.push(value);
         let vec_len = locked_vec.len();
         if debug_log {
-            println!("Push  data buffer length:{}", vec_len);
+            println!("Push data buffer length:{}", vec_len);
         }
-        if vec_len >= push_data_size {
+        if vec_len >= locked_vec.capacity() { // Capacity should never grow over original push_data_size
             println!("Flushing data buffer --- length: {}", locked_vec.len());
             push_data(locked_vec.clone(), &client, force_cloud).await?; 
             locked_vec.truncate(0);

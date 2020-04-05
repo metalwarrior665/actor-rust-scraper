@@ -8,15 +8,62 @@ use std::time::Duration;
 
 use std::sync::{Arc};
 
+pub struct CrawlerOptions {
+    extract: Vec<Extract>,
+    proxy_settings: Option<ProxySettings>,
+    force_cloud: bool,
+    debug_log: bool,
+    push_data_size: usize,
+    max_concurrency: usize,
+    max_request_retries: usize
+}
+
+impl Default for CrawlerOptions {
+    fn default() -> Self {
+        CrawlerOptions {
+            debug_log: false,
+            force_cloud: false,
+            push_data_size: 500,
+            max_concurrency: 200,
+            max_request_retries: 3,
+            proxy_settings: Some(Default::default()),
+            extract: vec![Default::default()]
+        }
+    }
+}
+
+// Builders
+impl CrawlerOptions {
+    pub fn set_extract(&mut self, extract: Vec<Extract>) -> &mut Self {
+        self.extract = extract;
+        self
+    }
+    pub fn set_push_data_size(&mut self, push_data_size: usize) -> &mut Self {
+        self.push_data_size = push_data_size;
+        self
+    }
+    pub fn set_max_concurrency(&mut self, max_concurrency: usize) -> &mut Self {
+        self.max_concurrency = max_concurrency;
+        self    
+    }
+    pub fn set_max_request_retries(&mut self, max_request_retries: usize) -> &mut Self {
+        self.max_request_retries = max_request_retries;
+        self
+    }
+    pub fn set_proxy_settings(&mut self, proxy_settings: ProxySettings) -> &mut Self {
+        self.proxy_settings = Some(proxy_settings);
+        self
+    }
+}
+
 pub struct Crawler {
     request_list: RequestList,
     extract: Vec<Extract>,
     force_cloud: bool,
     debug_log: bool,
-    push_data_size: usize,
     push_data_buffer: Arc<futures::lock::Mutex<Vec<serde_json::Value>>>,
     client: reqwest::Client,
-    proxy_client: reqwest::Client,
+    proxy_client: reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
     max_concurrency: usize,
     max_request_retries: usize
 }
@@ -24,17 +71,12 @@ pub struct Crawler {
 impl Crawler {
     pub fn new(
         request_list: RequestList,
-        extract: Vec<Extract>,
-        proxy_settings: Option<ProxySettings>,
-        push_data_size: usize,
-        force_cloud: bool,
-        debug_log: bool,
-        max_concurrency: usize
+        options: CrawlerOptions
     ) -> Crawler {
         println!("STATUS --- Initializing crawler");
         let client = reqwest::Client::builder().build().unwrap();
 
-        let proxy = get_apify_proxy(&proxy_settings);
+        let proxy = get_apify_proxy(&options.proxy_settings);
         let proxy_client = match proxy {
             Some(proxy) => {
                 let proxy_client = reqwest::Client::builder()
@@ -48,15 +90,14 @@ impl Crawler {
         };
         Crawler {
             request_list,
-            extract,
-            force_cloud,
-            debug_log,
-            push_data_size,
-            push_data_buffer: Arc::new(futures::lock::Mutex::new(Vec::with_capacity(push_data_size))),
+            push_data_buffer: Arc::new(futures::lock::Mutex::new(Vec::with_capacity(options.push_data_size))),
             client,
             proxy_client,
-            max_concurrency,
-            max_request_retries: 3 // hardcoded for now
+            extract: options.extract,
+            force_cloud: options.force_cloud,
+            debug_log: options.debug_log,
+            max_concurrency: options.max_concurrency,
+            max_request_retries: options.max_request_retries
         }
     }
 
@@ -78,6 +119,13 @@ impl Crawler {
                 let locked_state = self.request_list.state.lock().await;
                 (locked_state.in_progress.len(), locked_state.reclaimed.len())
             };
+
+            // ****
+            // We have to careful here that (in_progress_count, reclaimed_count) can get out of sync here
+            // But since the threads can only lower it, it will not go above max_concurrency
+            // Thus being correct 
+            // But need to observe if new features come
+            // ****
 
             // If there is any reclaimed one, we always pick,
             // reclaimed is subset of in_progress so it should no go above max_concurrency
@@ -114,7 +162,6 @@ impl Crawler {
             let proxy_client = self.proxy_client.clone();
             let push_data_buffer = self.push_data_buffer.clone();
             let force_cloud = self.force_cloud;
-            let push_data_size = self.push_data_size;
             
             let max_request_retries = self.max_request_retries;
 
@@ -128,7 +175,6 @@ impl Crawler {
                     extract,
                     client,
                     proxy_client,
-                    push_data_size,
                     push_data_buffer,
                     force_cloud,
                     debug_log,
@@ -137,10 +183,10 @@ impl Crawler {
                 match extract_data_result {
                     Ok(()) => {
                         // mark_request_handled inlined here
-                        //if (debug_log) {
+                        if (debug_log) {
                             println!("SUCCESS: Retry count: {}, URL: {}",
                             req.retry_count, req.url); 
-                        //}
+                        }
                         let mut locked_state = state.lock().await;
                         locked_state.in_progress.remove(&req.unique_key);
                     },
@@ -162,11 +208,13 @@ impl Crawler {
                         locked_state.in_progress.remove(&req.unique_key);
                     }
                 } 
-                
+                // Log concurrency
+                /*
                 {
                     let locked_state = state.lock().await;
                     println!("In progress count:{}", locked_state.in_progress.len());
                 }
+                */
                 extract_data_result
             });
             task_handles.push(handle);

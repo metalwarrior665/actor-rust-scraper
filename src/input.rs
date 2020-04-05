@@ -1,15 +1,52 @@
 // #[macro_use] extern crate serde_derive;
-use crate::request::Request;
+use crate::crawler::CrawlerOptions;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SourceRequest {
+    // id: String,
+    pub url: String,
+    pub unique_key: Option<String>,
+    // method: String,
+    // payload: String,
+    // retry: bool,
+    // error_messages: Vec<String>,
+    // headers: HashMap<String, String>,
+    // user_data: HashMap<String, String>,
+    // handled_at: String
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Input {
-    pub urls: Vec<Request>,
-    pub extract: Vec<Extract>,
+    pub urls: Vec<SourceRequest>,
+    pub extract: Option<Vec<Extract>>,
     pub proxy_settings: Option<ProxySettings>,
-    pub force_cloud: bool,
-    pub debug_log: bool,
-    pub push_data_size: usize,
-    pub max_concurrency: usize
+    pub force_cloud: Option<bool>,
+    pub debug_log: Option<bool>,
+    pub push_data_size: Option<usize>,
+    pub max_concurrency: Option<usize>,
+    pub max_request_retries: Option<usize>,
+}
+
+impl Input {
+    pub fn to_options (self) -> CrawlerOptions {
+        let mut options: CrawlerOptions = Default::default();
+        if let Some(extract) = self.extract {
+            options.set_extract(extract);
+        }
+        if let Some(proxy_settings) = self.proxy_settings {
+            options.set_proxy_settings(proxy_settings);
+        }
+        if let Some(push_data_size) = self.push_data_size {
+            options.set_push_data_size(push_data_size);
+        }
+        if let Some(max_concurrency) = self.max_concurrency {
+            options.set_max_concurrency(max_concurrency);
+        }
+        if let Some(max_request_retries) = self.max_request_retries {
+            options.set_max_request_retries(max_request_retries);
+        }
+        options
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -19,6 +56,15 @@ pub struct Extract {
     pub extract_type: ExtractType
 }
 
+impl Default for Extract {
+    fn default() -> Self {
+        Extract {
+            field_name: "description".to_owned(),
+            selector: "meta[name=\"description\"]".to_owned(),
+            extract_type: ExtractType::Attribute("content".to_owned())
+        }
+    }
+}
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum ExtractType {
@@ -31,4 +77,13 @@ pub enum ExtractType {
 pub struct ProxySettings {
     pub useApifyProxy: bool,
     pub apifyProxyGroups: Option<Vec<String>>
+}
+
+impl Default for ProxySettings {
+    fn default() -> Self {
+        ProxySettings {
+            useApifyProxy: true,
+            apifyProxyGroups: None
+        }
+    }
 }
