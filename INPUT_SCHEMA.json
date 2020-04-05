@@ -17,13 +17,20 @@
             "title": "Push data buffer size",
             "type": "integer",
             "description": "Buffers results into vector (array) before pushing to a dataset. This prevents overwhelming Apify API.",
-            "prefill": 500
+            "default": 500
         },
         "max_concurrency": {
             "title": "Max concurrency",
             "type": "integer",
             "description": "Sets the maximum concurrency (parallelism) for the crawl.",
-            "default": 100,
+            "default": 200,
+            "minimum": 1
+        },
+        "max_request_retries": {
+            "title": "Max request retries",
+            "type": "integer",
+            "description": "Sets the maximum number of retries for each request(URL).",
+            "default": 3,
             "minimum": 1
         },
         "debug_log": {
