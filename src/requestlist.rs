@@ -23,8 +23,8 @@ impl RequestList {
     pub fn new(sources: Vec<SourceRequest>) -> RequestList {
         let mut requests: Vec<Request> = vec![];
         let mut unique_key_to_index = HashMap::with_capacity(sources.len());
-        for (i, req) in sources.into_iter().enumerate() {
-            let new_req = Request::new(req);
+        for (i, source_req) in sources.into_iter().enumerate() {
+            let new_req = Request::new(source_req);
             if !unique_key_to_index.contains_key(&new_req.unique_key) {
                 unique_key_to_index.insert(new_req.unique_key.clone(), i);
                 requests.push(new_req);
@@ -75,7 +75,7 @@ impl RequestList {
         let next_req = locked_state.requests[locked_state.next_index].clone();
         locked_state.in_progress.insert(next_req.url.clone());
         locked_state.next_index += 1;
-        return Some(next_req);
+        Some(next_req)
     }
 
     // I use this fn inlined for now

@@ -58,7 +58,7 @@ pub async fn get_value (key: &str) -> Result<Input, Box<dyn std::error::Error + 
 }
 
 #[allow(dead_code)]
-pub async fn set_value (key: &str, value: &Vec<Value>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn set_value (key: &str, value: &[Value]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let is_on_apify = get_is_on_apify();
     let json = serde_json::to_string(&value)?;
     if is_on_apify {
@@ -73,6 +73,6 @@ pub async fn set_value (key: &str, value: &Vec<Value>) -> Result<(), Box<dyn std
     Ok(())
 }
 
-pub async fn request_text(url: &String, client: &reqwest::Client) -> Result<String, reqwest::Error> {
+pub async fn request_text(url: &str, client: &reqwest::Client) -> Result<String, reqwest::Error> {
     Ok(client.get(url).send().await?.text().await?) 
 }

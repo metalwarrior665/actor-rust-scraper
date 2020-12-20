@@ -13,15 +13,16 @@ use crate::request::Request;
 
 
 pub async fn extract_data_from_url(
-    req: Request, // immutable here
-    extract: Vec<Extract>,
-    client: reqwest::Client,
+    req: &Request, // immutable here
+    actor: crate::actor::Actor,
+    extract: &Vec<Extract>,
+    client: &reqwest::Client,
     proxy_client: reqwest::Client,
     push_data_buffer: Arc<futures::lock::Mutex<Vec<serde_json::Value>>>,
     force_cloud: bool,
     debug_log: bool
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let url = req.url;
+    let url = &req.url;
     if debug_log {
         println!("Started extraction --- {}", url);
     }
@@ -46,7 +47,7 @@ pub async fn extract_data_from_url(
     let extract_time;
     {
         let now = Instant::now();
-        let dom = Html::parse_document(&html).clone();
+        let dom = Html::parse_document(&html);
         parse_time = now.elapsed().as_millis();
     
         let now = Instant::now();
@@ -91,7 +92,14 @@ pub async fn extract_data_from_url(
         }
         if vec_len >= locked_vec.capacity() { // Capacity should never grow over original push_data_size
             println!("Flushing data buffer --- length: {}", locked_vec.len());
-            push_data(locked_vec.clone(), &client, force_cloud).await?; 
+            if force_cloud {
+                actor.client.put_items(&apify_client::client::IdOrName::Id("qdFyJscHebXJqilLu".to_string()), &locked_vec)
+                    .send().await;
+            } else {
+                push_data(locked_vec.clone(), &client, force_cloud).await?; 
+            }
+            // TODO: Fix actor implementation
+            // actor.push_data(&locked_vec).await?;
             locked_vec.truncate(0);
             println!("Flushed data buffer --- length: {}", locked_vec.len());
         }

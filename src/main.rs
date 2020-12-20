@@ -1,13 +1,5 @@
 #![allow(dead_code)]
 
-extern crate reqwest;
-extern crate serde_json;
-extern crate scraper;
-extern crate serde;
-extern crate tokio;
-extern crate futures;
-extern crate rand;
-
 #[macro_use] extern crate serde_derive;
 
 mod crawler;
@@ -19,10 +11,16 @@ mod proxy;
 mod extract_fn;
 mod errors;
 
+// SDK testing here
+mod actor;
+mod dataset;
+mod utils;
+
 use requestlist::RequestList;
 use crate::crawler::{Crawler, CrawlerOptions};
 use input::{Input};
 use storage::{get_value}; 
+// use apify::actor::Actor;
 
 // To not compile libraries on Apify, it is important to not commit Cargo.lock
 

@@ -3,7 +3,6 @@ use crate::input::{Extract, ProxySettings};
 use crate::extract_fn::extract_data_from_url;
 use crate::proxy:: {get_apify_proxy};
 use crate::storage:: {push_data};
-use crate::tokio;
 use std::time::Duration;
 
 use std::sync::{Arc};
@@ -58,6 +57,7 @@ impl CrawlerOptions {
 
 pub struct Crawler {
     request_list: RequestList,
+    actor: crate::actor::Actor,
     extract: Vec<Extract>,
     force_cloud: bool,
     debug_log: bool,
@@ -69,20 +69,16 @@ pub struct Crawler {
 }
 
 impl Crawler {
-    pub fn new(
-        request_list: RequestList,
-        options: CrawlerOptions
-    ) -> Crawler {
+    pub fn new(request_list: RequestList, options: CrawlerOptions) -> Crawler {
         println!("STATUS --- Initializing crawler");
         let client = reqwest::Client::builder().build().unwrap();
 
         let proxy = get_apify_proxy(&options.proxy_settings);
         let proxy_client = match proxy {
             Some(proxy) => {
-                let proxy_client = reqwest::Client::builder()
+                reqwest::Client::builder()
                     .proxy(reqwest::Proxy::all(&proxy.base_url).unwrap().basic_auth(&proxy.username, &proxy.password))
-                    .build().unwrap();
-                proxy_client
+                    .build().unwrap()
             },
             None => {
                 client.clone()
@@ -90,6 +86,7 @@ impl Crawler {
         };
         Crawler {
             request_list,
+            actor: crate::actor::Actor::new(),
             push_data_buffer: Arc::new(futures::lock::Mutex::new(Vec::with_capacity(options.push_data_size))),
             client,
             proxy_client,
@@ -162,18 +159,33 @@ impl Crawler {
             let proxy_client = self.proxy_client.clone();
             let push_data_buffer = self.push_data_buffer.clone();
             let force_cloud = self.force_cloud;
+            let actor = self.actor.clone();
+            let req_cloned = req.clone();
             
             let max_request_retries = self.max_request_retries;
 
             // Sending the state via Arc to a thread
             let state = Arc::clone(&self.request_list.state);
             let unique_key_to_index = Arc::clone(&self.request_list.unique_key_to_index);
+
+            // This is a tricky situation
+            // Spawn needs to be move because the Future has to be 'static
+            // That prevents us passing normal references
+            // But we know that we could pass them because we join all the tasks before Crawler goes out of scope
+            // This is only about immutable references, mutable need to be inside Mutex anyway
+            // Several possibillities:
+            // 1. Clone everything - done now, is dumb and wrong
+            // 2. Arc - Adds runtime overhead and looks ugly
+            // 3. Unsafe code - mem::transmute et.
+            // 4. Port some previous implementation from https://docs.rs/tokio-scoped/0.1.0/tokio_scoped/.
+            // It was discontinued because there are ways user can break it
             
             let handle = tokio::task::spawn(async move {
                 let extract_data_result = extract_data_from_url(
-                    req.clone(),
-                    extract,
-                    client,
+                    &req_cloned,
+                    actor,
+                    &extract,
+                    &client,
                     proxy_client,
                     push_data_buffer,
                     force_cloud,
@@ -183,7 +195,7 @@ impl Crawler {
                 match extract_data_result {
                     Ok(()) => {
                         // mark_request_handled inlined here
-                        if (debug_log) {
+                        if debug_log {
                             println!("SUCCESS: Retry count: {}, URL: {}",
                             req.retry_count, req.url); 
                         }
