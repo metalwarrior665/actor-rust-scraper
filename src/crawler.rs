@@ -5,7 +5,7 @@ use crate::proxy:: {get_apify_proxy};
 use crate::storage:: {push_data};
 use std::time::Duration;
 
-use std::sync::{Arc};
+use async_scoped::TokioScope;
 
 pub struct CrawlerOptions {
     extract: Vec<Extract>,
@@ -61,7 +61,7 @@ pub struct Crawler {
     extract: Vec<Extract>,
     force_cloud: bool,
     debug_log: bool,
-    push_data_buffer: Arc<futures::lock::Mutex<Vec<serde_json::Value>>>,
+    push_data_buffer: futures::lock::Mutex<Vec<serde_json::Value>>,
     client: reqwest::Client,
     proxy_client: reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
     max_concurrency: usize,
@@ -87,7 +87,7 @@ impl Crawler {
         Crawler {
             request_list,
             actor: crate::actor::Actor::new(),
-            push_data_buffer: Arc::new(futures::lock::Mutex::new(Vec::with_capacity(options.push_data_size))),
+            push_data_buffer: futures::lock::Mutex::new(Vec::with_capacity(options.push_data_size)),
             client,
             proxy_client,
             extract: options.extract,
@@ -99,18 +99,11 @@ impl Crawler {
     }
 
     pub async fn run(self) { 
-        let mut task_handles = vec![];
-
-        // This is only to keep copies for later
-        let push_data_buffer_2 = self.push_data_buffer.clone();
-        let client_2 = self.client.clone();
-        let force_cloud = self.force_cloud;
+        let mut scope = unsafe {
+            TokioScope::create()
+        };
 
         loop {
-            let debug_log = self.debug_log;
-            if debug_log {
-                // println!("Loop iteration start");
-            }
             // Check concurrency
             let (in_progress_count, reclaimed_count) = {
                 let locked_state = self.request_list.state.lock().await;
@@ -153,61 +146,35 @@ impl Crawler {
             };
 
             // println!("Took new request: {:?}", req);
-
-            let extract = self.extract.clone();
-            let client = self.client.clone();
-            let proxy_client = self.proxy_client.clone();
-            let push_data_buffer = self.push_data_buffer.clone();
-            let force_cloud = self.force_cloud;
-            let actor = self.actor.clone();
-            let req_cloned = req.clone();
-            
-            let max_request_retries = self.max_request_retries;
-
-            // Sending the state via Arc to a thread
-            let state = Arc::clone(&self.request_list.state);
-            let unique_key_to_index = Arc::clone(&self.request_list.unique_key_to_index);
-
-            // This is a tricky situation
-            // Spawn needs to be move because the Future has to be 'static
-            // That prevents us passing normal references
-            // But we know that we could pass them because we join all the tasks before Crawler goes out of scope
-            // This is only about immutable references, mutable need to be inside Mutex anyway
-            // Several possibillities:
-            // 1. Clone everything - done now, is dumb and wrong
-            // 2. Arc - Adds runtime overhead and looks ugly
-            // 3. Unsafe code - mem::transmute et.
-            // 4. Port some previous implementation from https://docs.rs/tokio-scoped/0.1.0/tokio_scoped/.
-            // It was discontinued because there are ways user can break it
-            
-            let handle = tokio::task::spawn(async move {
+                        
+            scope.spawn(async {
                 let extract_data_result = extract_data_from_url(
-                    &req_cloned,
-                    actor,
-                    &extract,
-                    &client,
-                    proxy_client,
-                    push_data_buffer,
-                    force_cloud,
-                    debug_log,
+                    &req,
+                    &self.actor,
+                    &self.extract,
+                    &self.client,
+                    &self.proxy_client,
+                    &self.push_data_buffer,
+                    self.force_cloud,
+                    self.debug_log,
                 ).await;
 
                 match extract_data_result {
                     Ok(()) => {
                         // mark_request_handled inlined here
-                        if debug_log {
+                        if self.debug_log {
                             println!("SUCCESS: Retry count: {}, URL: {}",
                             req.retry_count, req.url); 
                         }
-                        let mut locked_state = state.lock().await;
+                        let mut locked_state = self.request_list.state.lock().await;
                         locked_state.in_progress.remove(&req.unique_key);
                     },
-                    Err(ref e) if req.retry_count < max_request_retries => {
+                    Err(ref e) if req.retry_count < self.max_request_retries => {
                         // reclaim_request inlined here
                         println!("ERROR: Reclaiming request! Retry count: {}, URL: {}, error: {}",
                             req.retry_count, req.url, e);
-                        let index = *unique_key_to_index.get(&req.unique_key).unwrap();
-                        let mut locked_state = state.lock().await;
+                        let index = *self.request_list.unique_key_to_index.get(&req.unique_key).unwrap();
+                        let mut locked_state = self.request_list.state.lock().await;
                         locked_state.requests[index].retry_count += 1;
                         locked_state.reclaimed.insert(req.unique_key);
                     },
@@ -215,7 +182,7 @@ impl Crawler {
                         // mark_request_failed
                         println!("ERROR: Max retries reached, marking failed! Retry count: {}, URL: {}, error: {}",
                             req.retry_count, req.url, e);
-                        let mut locked_state = state.lock().await;
+                        let mut locked_state = self.request_list.state.lock().await;
                         locked_state.reclaimed.remove(&req.unique_key);
                         locked_state.in_progress.remove(&req.unique_key);
                     }
@@ -227,20 +194,18 @@ impl Crawler {
                     println!("In progress count:{}", locked_state.in_progress.len());
                 }
                 */
-                extract_data_result
+                // extract_data_result
             });
-            task_handles.push(handle);
-        }
-        
-        for handle in task_handles {
-            handle.await;
         }
 
+        // Dropping the scope awaits all remaining requests 
+        drop(scope);
+        
         // After we are done looping, we need to flush the push_data_buffer one last time
-        let locked_vec = push_data_buffer_2.lock().await;
+        let locked_vec = self.push_data_buffer.lock().await;
 
         // TODO: We should not need to clone here
         println!("Remaing Push data buffer length before last push:{}", locked_vec.len());
-        push_data(locked_vec.clone(), &client_2, force_cloud).await.unwrap(); 
+        push_data(locked_vec.clone(), &self.client, self.force_cloud).await.unwrap(); 
     } 
 }
