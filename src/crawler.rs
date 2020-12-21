@@ -198,8 +198,8 @@ impl Crawler {
             });
         }
 
-        // Dropping the scope awaits all remaining requests 
-        drop(scope);
+        // Here we await all remaining requests 
+        let _ = scope.collect();
         
         // After we are done looping, we need to flush the push_data_buffer one last time
         let locked_vec = self.push_data_buffer.lock().await;
