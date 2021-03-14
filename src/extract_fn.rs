@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::time::{Instant};
-use std::sync::{ Arc };
 
 use scraper::{Selector, Html};
 use serde_json::{Value};
@@ -14,11 +13,11 @@ use crate::request::Request;
 
 pub async fn extract_data_from_url(
     req: &Request, // immutable here
-    actor: crate::actor::Actor,
+    actor: &crate::actor::Actor,
     extract: &Vec<Extract>,
     client: &reqwest::Client,
-    proxy_client: reqwest::Client,
-    push_data_buffer: Arc<futures::lock::Mutex<Vec<serde_json::Value>>>,
+    proxy_client: &reqwest::Client,
+    push_data_buffer: &futures::lock::Mutex<Vec<serde_json::Value>>,
     force_cloud: bool,
     debug_log: bool
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -93,8 +92,8 @@ pub async fn extract_data_from_url(
         if vec_len >= locked_vec.capacity() { // Capacity should never grow over original push_data_size
             println!("Flushing data buffer --- length: {}", locked_vec.len());
             if force_cloud {
-                actor.client.put_items(&apify_client::client::IdOrName::Id("qdFyJscHebXJqilLu".to_string()), &locked_vec)
-                    .send().await;
+                actor.client.put_items(&apify_client::client::IdOrName::Id("qdFyJscHebXJqilLu".to_string()), &*locked_vec)
+                    .send().await?;
             } else {
                 push_data(locked_vec.clone(), &client, force_cloud).await?; 
             }

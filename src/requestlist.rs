@@ -1,5 +1,4 @@
 use futures::lock::{Mutex};
-use std::sync::{ Arc };
 use std::collections::{HashSet, HashMap};
 
 use crate::request::Request;
@@ -14,8 +13,8 @@ pub struct RequestListState {
 }
 
 pub struct RequestList {
-    pub state: Arc<Mutex<RequestListState>>,
-    pub unique_key_to_index: Arc<HashMap<String, usize>>
+    pub state: Mutex<RequestListState>,
+    pub unique_key_to_index: HashMap<String, usize>,
 }
 
 // The implementation is very simplified verison of - https://github.com/apifytech/apify-js/blob/master/src/request_list.js 
@@ -39,8 +38,8 @@ impl RequestList {
             requests,
         };
         RequestList {
-            state: Arc::new(Mutex::new(fresh_state)),
-            unique_key_to_index: Arc::new(unique_key_to_index)
+            state: Mutex::new(fresh_state),
+            unique_key_to_index,
         }
     }
 

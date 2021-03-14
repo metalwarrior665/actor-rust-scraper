@@ -3,5 +3,5 @@
 
 apify_storage
 Cargo.lock
-default-args.txt
+test_local
 crawlernew.rs
