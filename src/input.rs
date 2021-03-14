@@ -45,6 +45,9 @@ impl Input {
         if let Some(max_request_retries) = self.max_request_retries {
             options.set_max_request_retries(max_request_retries);
         }
+        if let Some(debug_log) = self.debug_log {
+            options.set_debug_log(debug_log);
+        }
         options
     }
 }

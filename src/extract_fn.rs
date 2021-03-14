@@ -92,8 +92,8 @@ pub async fn extract_data_from_url(
         if vec_len >= locked_vec.capacity() { // Capacity should never grow over original push_data_size
             println!("Flushing data buffer --- length: {}", locked_vec.len());
             if force_cloud {
-                actor.client.put_items(&apify_client::client::IdOrName::Id("qdFyJscHebXJqilLu".to_string()), &locked_vec)
-                    .send().await;
+                actor.client.put_items(&apify_client::client::IdOrName::Id("qdFyJscHebXJqilLu".to_string()), &*locked_vec)
+                    .send().await?;
             } else {
                 push_data(locked_vec.clone(), &client, force_cloud).await?; 
             }

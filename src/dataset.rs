@@ -16,7 +16,7 @@ impl DatasetHandle {
     pub async fn push_data<T: serde::Serialize> (&self, data: &[T]) 
         -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if self.is_on_cloud {
-            self.client.put_items(&IdOrName::Id(self.id.clone()), data).send().await;
+            self.client.put_items(&IdOrName::Id(self.id.clone()), &data).send().await?;
         } else {
             for val in data.iter() {
                 let json = serde_json::to_string(&val)?;

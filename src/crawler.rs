@@ -53,6 +53,10 @@ impl CrawlerOptions {
         self.proxy_settings = Some(proxy_settings);
         self
     }
+    pub fn set_debug_log(&mut self, debug_log: bool) -> &mut Self {
+        self.debug_log = debug_log;
+        self
+    }
 }
 
 pub struct Crawler {
@@ -62,6 +66,7 @@ pub struct Crawler {
     force_cloud: bool,
     debug_log: bool,
     push_data_buffer: futures::lock::Mutex<Vec<serde_json::Value>>,
+    // Remove non proxy client after everything is implemented in apify_client
     client: reqwest::Client,
     proxy_client: reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
     max_concurrency: usize,
@@ -120,8 +125,10 @@ impl Crawler {
             // If there is any reclaimed one, we always pick,
             // reclaimed is subset of in_progress so it should no go above max_concurrency
             if reclaimed_count == 0 && in_progress_count >= self.max_concurrency {
-                // println!("Max concurrency {} reached, waiting", self.max_concurrency);
-                tokio::time::delay_for(Duration::from_millis(10)).await;
+                if self.debug_log {
+                    // println!("Max concurrency {} reached, waiting", self.max_concurrency);
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
                 continue;
             }
 
@@ -136,7 +143,7 @@ impl Crawler {
                     }
                     if in_progress_count > 0 {
                         // println!("We still have some in-progress, waiting");
-                        tokio::time::delay_for(Duration::from_millis(10)).await;
+                        tokio::time::sleep(Duration::from_millis(10)).await;
                         continue;
                     } else {
                         break;
@@ -148,6 +155,9 @@ impl Crawler {
             // println!("Took new request: {:?}", req);
                         
             scope.spawn(async {
+                if self.debug_log {
+                    println!("Spawning extraction for {}", req.url);
+                }
                 let extract_data_result = extract_data_from_url(
                     &req,
                     &self.actor,
@@ -158,6 +168,16 @@ impl Crawler {
                     self.force_cloud,
                     self.debug_log,
                 ).await;
+
+                if self.debug_log {
+                    println!("Extraction finished for {}", req.url);
+                }
+
+                // Log concurrency
+                if self.debug_log {
+                    let locked_state = self.request_list.state.lock().await;
+                    println!("In progress count:{}", locked_state.in_progress.len());
+                }
 
                 match extract_data_result {
                     Ok(()) => {
@@ -186,15 +206,7 @@ impl Crawler {
                         locked_state.reclaimed.remove(&req.unique_key);
                         locked_state.in_progress.remove(&req.unique_key);
                     }
-                } 
-                // Log concurrency
-                /*
-                {
-                    let locked_state = state.lock().await;
-                    println!("In progress count:{}", locked_state.in_progress.len());
-                }
-                */
-                // extract_data_result
+                }          
             });
         }
 
