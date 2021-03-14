@@ -1,4 +1,4 @@
-FROM rustlang/rust
+FROM rust:1.50-slim
 
 COPY . .
 
