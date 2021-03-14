@@ -1,4 +1,4 @@
-FROM rust:1.50-slim
+FROM rust:1.50
 
 COPY . .
 
