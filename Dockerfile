@@ -1,4 +1,4 @@
-FROM rust:1.50
+FROM metalwarrior665/rust-crawler
 
 COPY . .
 
