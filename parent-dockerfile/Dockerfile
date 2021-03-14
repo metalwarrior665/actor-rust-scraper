@@ -6,4 +6,4 @@ RUN ls
 
 RUN cargo build --release
 
-RUN rm -rf src
+RUN rm -rf src 
