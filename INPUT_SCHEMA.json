@@ -2,54 +2,21 @@
     "title": "Rust crawler",
     "type": "object",
     "schemaVersion": 1,
-    "required": [],
+    "required": ["urls", "extract"],
     "properties": {
         "urls": {
             "title": "Start URLs",
             "type": "array",
-            "description": "URLs to start with",
+            "description": "URLs that will be scraped. Must be an array of objects with \"url\" property.",
             "prefill": [
                 { "url": "http://example.com" }
             ],
             "editor": "requestListSources"
         },
-        "push_data_size": {
-            "title": "Push data buffer size",
-            "type": "integer",
-            "description": "Buffers results into vector (array) before pushing to a dataset. This prevents overwhelming Apify API.",
-            "default": 500
-        },
-        "max_concurrency": {
-            "title": "Max concurrency",
-            "type": "integer",
-            "description": "Sets the maximum concurrency (parallelism) for the crawl.",
-            "default": 200,
-            "minimum": 1
-        },
-        "max_request_retries": {
-            "title": "Max request retries",
-            "type": "integer",
-            "description": "Sets the maximum number of retries for each request(URL).",
-            "default": 3,
-            "minimum": 1
-        },
-        "debug_log": {
-            "title": "Debug log",
-            "type": "boolean",
-            "description": "Shows when each URL starts and ends scraping with timings. Don't use for larger fast runs.",
-            "default": false
-        },
-        "proxy_settings": {
-            "title": "Proxy configuration",
-            "type": "object",
-            "description": "Select proxies to be used by your crawler.",
-            "prefill": { "useApifyProxy": true },
-            "editor": "proxy"
-        },
         "extract": {
             "title": "Extraction config",
             "type": "array",
-            "description": "See readme for more info",
+            "description": "Array that defines what and how should be scraped from a page HTML. See readme for more info.",
             "editor": "json",
             "prefill": [
                 {
@@ -68,10 +35,43 @@
                 }
             ]
         },
+        "proxy_settings": {
+            "title": "Proxy configuration",
+            "type": "object",
+            "description": "Select proxies to be used by your crawler. For most use cases we recommend the default Apify automatic proxy.",
+            "prefill": { "useApifyProxy": true },
+            "editor": "proxy"
+        },
+        "max_concurrency": {
+            "title": "Max concurrency",
+            "type": "integer",
+            "description": "Sets the maximum concurrency (parallelism) for the crawl. Keep this is reasonable level because this scraper can go really fast.",
+            "default": 50,
+            "minimum": 1
+        },
+        "max_request_retries": {
+            "title": "Max request retries",
+            "type": "integer",
+            "description": "Sets the maximum number of retries for each request(URL).",
+            "default": 3,
+            "minimum": 1
+        },
+        "debug_log": {
+            "title": "Debug log",
+            "type": "boolean",
+            "description": "Shows when each URL starts and ends scraping with timings. Don't use for larger runs as the log gets filled quickly.",
+            "default": false
+        },
+        "push_data_size": {
+            "title": "Push data buffer size",
+            "type": "integer",
+            "description": "Buffers results into vector (array) before pushing to a dataset. This prevents overwhelming Apify API. The default number is usually a good choice.",
+            "default": 500
+        },
         "force_cloud": {
             "title": "Force cloud",
             "type": "boolean",
-            "description": "This allows local runs to use cloud storage, just for testing. On platform this has no effect.",
+            "description": "This allows local runs to use cloud storage, mainly for testing. On Apify platform this has no effect.",
             "default": false
         }
     }

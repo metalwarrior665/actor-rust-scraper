@@ -1,30 +1,24 @@
+<!-- toc start -->
 ## Rust Scraper
 
+<!-- toc end -->
 **This is super early version for experimentation. Use at your own risk!**
 
-Speed of light scraping with Rust programming language. This is meant to be a faster (but less flexible) version of JavaScript based [Cheerio Scraper](https://apify.com/apify/cheerio-scraper).
+Speed of light scraping with Rust programming language. This is meant to be a faster (but less flexible) version of Apify's JavaScript based [Cheerio Scraper](https://apify.com/apify/cheerio-scraper).
 
-Rust is one of the fastest programming languages out there. In many cases, it matches the speed of C. Although JavaScript offers huge flexibility and development speed, we can use Rust to significantly speed up the crawling and/or reduce costs.
+Rust is one of the fastest programming languages out there. In many cases, it matches the speed of C. Although JavaScript offers huge flexibility and development speed, we can use Rust to significantly speed up the crawling and/or reduce costs. Rust scraper is both faster and requires less memory.
 
 ### Changelog
-#### 2020-02-09
-- Added support of async scraping. Can be turned on with `"run_async": true`.
-- Added buffering of results before pushing into dataset (to not overwhelm Apify API). Can be changed via `push_data_size`.
-
-#### 2020-04-04
-- Removed sync mode and `run_async` option. Everything is async now.
-- Added `max_concurrency` field. This fixes all memory problems with previous async implementation.
-
-#### 2020-04-06
-- Added `max_request_retries` field and retrying failed requests in general.
+You can read about fixes and updates in the detailed [changelog file](https://github.com/metalwarrior665/actor-rust-scraper/blob/master/CHANGELOG.md).
 
 ### WARNING!!! Don't DDOS a website!
 Because this scraper is so fast, you can easily take a website down. This matters especially if you scrape **more than few hundred URLs** and use the **async** scraping mode.
 How to prevent that:
-- Only scrape large websites that can handle a load of 1000 requests/second and more.
+- Set reasonable `max_concurrency` input field. You can still scrape very fast and with tiny memory footprint if you set it below `10`.
+- If you want to set high `max_concurrency`, only scrape large websites that can handle a load of 1000 requests/second and more.
 - Use large pool of proxies so they are not immediately banned.
 
-**If we see you abusing this scraper on Apify platform, your account will be banned**.
+**If we see you abusing this scraper for attacks on Apify platform, your account can be banned**.
 
 ### Why it is faster/cheaper than Cheerio Scraper?
 Rust is statically typed language compiled directly into machine code. Because of this, it can optimize the code into the most efficient structures and algorithms. Of course, it is also job of the programmer to write the code efficiently so we expect further improvements for this scraper.
@@ -43,17 +37,10 @@ Rust is statically typed language compiled directly into machine code. Because o
 - It doesn't have a sophisticated concurrency system. It will grow to `max_concurrency` unless CPU gets overwhelmed.
 
 ### Input
-Input is a JSON object with the properties below. You can also set it up on Apify platform with a nice UI.
-- `startUrls` (array(object)) Array of [request objects](https://sdk.apify.com/docs/api/request#docsNav). At the simplest level a request object looks like this: `{ "url": "http://example.com" }`
-- `push_data_size` (number) Buffers results into a vector (growable array) before pushing them to a dataset. This prevents overwhelming Apify API. The default value should work fine. **Default**: 500
-- `max_concurrency` (number) Sets the maximum concurrency (parallelism) for the crawl. **Default**: 100
-- `max_request_retries` (number) Sets the maximum number of retries for each request(URL). **Default**: 3
-- `debug_log` (boolean) Shows when each URL starts and ends scraping with timings. Don't use for larger fast runs.
-- `proxy_settings` (object) Proxy configuration of the actor. By default it uses automatic proxy but you can set it to `None` by passing `{ useApifyProxy: false }`.
-- `extact` (object) Extraction config. This will determine how and what data will be extracted. Check [Data extraction](#data-extraction)
+Input is a JSON object with the properties below explained in detail on the [Apify Store page](https://apify.com/lukaskrivka/rust-scraper/input-schema). You can also set it up on Apify platform with a nice UI.
 
 ### Data extraction
-You should provide an extraction configuration object. Such object will define selectors to find on the page, what to extract from those selector and finally names of the fields that the data should be saved as.
+You need to provide an [extraction configuration object](https://apify.com/lukaskrivka/rust-scraper/input-schema#extract). This object defines selectors to find on the page, what to extract from those selector and finally names of the fields that the data should be saved as.
 
 `extract` (array) is an array of objects where each object has:
 - `field_name` (string) Defines to which field will the data be assigned in your resulting dataset

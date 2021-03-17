@@ -43,6 +43,7 @@ impl RequestList {
         }
     }
 
+    // We should be able to use sync parking_lot mutex
     pub async fn fetch_next_request(&self) -> Option<Request> {
         
         let mut locked_state = self.state.lock().await;  
