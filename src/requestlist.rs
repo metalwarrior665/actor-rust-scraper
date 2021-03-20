@@ -1,7 +1,7 @@
 use std::collections::{HashSet, HashMap};
 
 use crate::request::Request;
-use crate::input::SourceRequest;
+use crate::input::RequestOptions;
 
 pub struct RequestListState {
     pub next_index: usize,
@@ -15,11 +15,12 @@ pub struct RequestList {
     // WARNING: We must never hold this lock across await (it will freeze)
     pub state: parking_lot::Mutex<RequestListState>,
     pub unique_key_to_index: HashMap<String, usize>,
+    debug_log: bool,
 }
 
 // The implementation is very simplified verison of - https://github.com/apifytech/apify-js/blob/master/src/request_list.js 
 impl RequestList {
-    pub fn new(sources: Vec<SourceRequest>) -> RequestList {
+    pub fn new(sources: Vec<RequestOptions>, debug_log: bool) -> RequestList {
         let mut requests: Vec<Request> = vec![];
         let mut unique_key_to_index = HashMap::with_capacity(sources.len());
         for (i, source_req) in sources.into_iter().enumerate() {
@@ -40,6 +41,7 @@ impl RequestList {
         RequestList {
             state: parking_lot::Mutex::new(fresh_state),
             unique_key_to_index,
+            debug_log,
         }
     }
 
@@ -88,7 +90,7 @@ impl RequestList {
         locked_state.reclaimed.insert(req.unique_key);
     }
 
-    pub fn mark_request_failed(&self, req: Request) {        
+    pub fn mark_request_failed(&self, req: Request) {    
         let mut locked_state = self.state.lock();
         locked_state.reclaimed.remove(&req.unique_key);
         locked_state.in_progress.remove(&req.unique_key);

@@ -1,8 +1,8 @@
 // #[macro_use] extern crate serde_derive;
-use crate::crawler::CrawlerOptions;
+use crate::basic_crawler::BasicCrawlerOptions;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SourceRequest {
+pub struct RequestOptions {
     // id: String,
     pub url: String,
     pub unique_key: Option<String>,
@@ -17,7 +17,7 @@ pub struct SourceRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Input {
-    pub urls: Vec<SourceRequest>,
+    pub urls: Vec<RequestOptions>,
     pub extract: Option<Vec<Extract>>,
     pub proxy_settings: Option<ProxySettings>,
     pub force_cloud: Option<bool>,
@@ -28,8 +28,8 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn to_options (self) -> CrawlerOptions {
-        let mut options: CrawlerOptions = Default::default();
+    pub fn to_options (self) -> BasicCrawlerOptions {
+        let mut options: BasicCrawlerOptions = Default::default();
         if let Some(extract) = self.extract {
             options.set_extract(extract);
         }

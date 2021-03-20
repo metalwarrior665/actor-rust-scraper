@@ -2,7 +2,8 @@
 
 #[macro_use] extern crate serde_derive;
 
-mod crawler;
+mod basic_crawler;
+mod http_crawler;
 mod requestlist;
 mod request;
 mod input;
@@ -17,7 +18,8 @@ mod dataset;
 mod utils;
 
 use requestlist::RequestList;
-use crate::crawler::{Crawler, CrawlerOptions};
+use crate::http_crawler::HttpCrawler;
+use crate::basic_crawler::{BasicCrawlerOptions};
 use input::{Input};
 use storage::{get_value}; 
 // use apify::actor::Actor;
@@ -31,12 +33,12 @@ async fn main() {
 
     let sources = input.urls.clone();
 
-    let req_list = RequestList::new(sources);
+    let req_list = RequestList::new(sources, input.debug_log.unwrap_or(false));
     println!("STATUS --- Initialized RequestList Input");
 
-    let options: CrawlerOptions = input.to_options();
+    let options: BasicCrawlerOptions = input.to_options();
 
-    let crawler = Crawler::new(req_list, options);
+    let crawler = HttpCrawler::new(req_list, options);
 
     println!("STATUS --- Starting Crawler");
     

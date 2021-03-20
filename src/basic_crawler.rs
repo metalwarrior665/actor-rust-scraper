@@ -1,25 +1,29 @@
 use crate::requestlist::RequestList;
+use crate::request::Request;
 use crate::input::{Extract, ProxySettings};
 use crate::extract_fn::extract_data_from_url;
 use crate::proxy:: {get_apify_proxy};
 use crate::storage:: {push_data};
+
 use std::time::Duration;
 
 use async_scoped::TokioScope;
 
-pub struct CrawlerOptions {
+type HandleRequestOutput = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+pub struct BasicCrawlerOptions {
     extract: Vec<Extract>,
     proxy_settings: Option<ProxySettings>,
     force_cloud: bool,
     debug_log: bool,
     push_data_size: usize,
     max_concurrency: usize,
-    max_request_retries: usize
+    max_request_retries: usize,
 }
 
-impl Default for CrawlerOptions {
+impl Default for BasicCrawlerOptions {
     fn default() -> Self {
-        CrawlerOptions {
+        BasicCrawlerOptions {
             debug_log: false,
             force_cloud: false,
             push_data_size: 500,
@@ -32,7 +36,7 @@ impl Default for CrawlerOptions {
 }
 
 // Builders
-impl CrawlerOptions {
+impl BasicCrawlerOptions {
     pub fn set_extract(&mut self, extract: Vec<Extract>) -> &mut Self {
         self.extract = extract;
         self
@@ -59,7 +63,7 @@ impl CrawlerOptions {
     }
 }
 
-pub struct Crawler {
+pub struct BasicCrawler {
     request_list: RequestList,
     actor: crate::actor::Actor,
     extract: Vec<Extract>,
@@ -73,8 +77,8 @@ pub struct Crawler {
     max_request_retries: usize
 }
 
-impl Crawler {
-    pub fn new(request_list: RequestList, options: CrawlerOptions) -> Crawler {
+impl BasicCrawler {
+    pub fn new(request_list: RequestList, options: BasicCrawlerOptions) -> BasicCrawler {
         println!("STATUS --- Initializing crawler");
         let client = reqwest::Client::builder().build().unwrap();
 
@@ -89,7 +93,7 @@ impl Crawler {
                 client.clone()
             }
         };
-        Crawler {
+        BasicCrawler {
             request_list,
             actor: crate::actor::Actor::new(),
             push_data_buffer: futures::lock::Mutex::new(Vec::with_capacity(options.push_data_size)),
@@ -101,6 +105,21 @@ impl Crawler {
             max_concurrency: options.max_concurrency,
             max_request_retries: options.max_request_retries
         }
+    }
+
+    pub async fn handle_request_function(&self, req: &Request)
+        -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let extract_data_result = extract_data_from_url(
+            &req,
+            &self.actor,
+            &self.extract,
+            &self.client,
+            &self.proxy_client,
+            &self.push_data_buffer,
+            self.force_cloud,
+            self.debug_log,
+        ).await;
+        extract_data_result
     }
 
     pub async fn run(self) { 
@@ -163,16 +182,8 @@ impl Crawler {
                 if self.debug_log {
                     println!("Spawning extraction for {}", req.url);
                 }
-                let extract_data_result = extract_data_from_url(
-                    &req,
-                    &self.actor,
-                    &self.extract,
-                    &self.client,
-                    &self.proxy_client,
-                    &self.push_data_buffer,
-                    self.force_cloud,
-                    self.debug_log,
-                ).await;
+
+                let extract_data_result = self.handle_request_function(&req).await;
 
                 if self.debug_log {
                     println!("Extraction finished for {}", req.url);
@@ -198,7 +209,6 @@ impl Crawler {
                             self.request_list.reclaim_request(req);
                     },
                     Err(ref e) => {
-                        // mark_request_failed
                         println!("ERROR: Max retries reached, marking failed! Retry count: {}, URL: {}, error: {}",
                             req.retry_count, req.url, e);
                         self.request_list.mark_request_failed(req);

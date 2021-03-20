@@ -1,4 +1,4 @@
-use crate::input::SourceRequest;
+use crate::input::RequestOptions;
 
 // Immutable part of Request
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -17,7 +17,7 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(req: SourceRequest) -> Request {
+    pub fn new(req: RequestOptions) -> Request {
         let unique_key = match req.unique_key {
             Some(key) => key,
             None => req.url.clone()
