@@ -87,4 +87,10 @@ impl RequestList {
         locked_state.requests[index].retry_count += 1;
         locked_state.reclaimed.insert(req.unique_key);
     }
+
+    pub fn mark_request_failed(&self, req: Request) {        
+        let mut locked_state = self.state.lock();
+        locked_state.reclaimed.remove(&req.unique_key);
+        locked_state.in_progress.remove(&req.unique_key);
+    }
 }

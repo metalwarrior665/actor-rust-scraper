@@ -201,9 +201,7 @@ impl Crawler {
                         // mark_request_failed
                         println!("ERROR: Max retries reached, marking failed! Retry count: {}, URL: {}, error: {}",
                             req.retry_count, req.url, e);
-                        let mut locked_state = self.request_list.state.lock();
-                        locked_state.reclaimed.remove(&req.unique_key);
-                        locked_state.in_progress.remove(&req.unique_key);
+                        self.request_list.mark_request_failed(req);
                     }
                 }          
             });
