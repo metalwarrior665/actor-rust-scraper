@@ -1,15 +1,15 @@
 use crate::requestlist::RequestList;
 use crate::request::Request;
 use crate::input::{Extract, ProxySettings};
-use crate::extract_fn::extract_data_from_url;
 use crate::proxy:: {get_apify_proxy};
 use crate::storage:: {push_data};
 
 use std::time::Duration;
+use std::future::Future;
 
 use async_scoped::TokioScope;
 
-type HandleRequestOutput = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+pub type HandleRequestOutput = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 pub struct BasicCrawlerOptions {
     extract: Vec<Extract>,
@@ -65,14 +65,14 @@ impl BasicCrawlerOptions {
 
 pub struct BasicCrawler {
     request_list: RequestList,
-    actor: crate::actor::Actor,
-    extract: Vec<Extract>,
-    force_cloud: bool,
-    debug_log: bool,
-    push_data_buffer: futures::lock::Mutex<Vec<serde_json::Value>>,
+    pub actor: crate::actor::Actor,
+    pub extract: Vec<Extract>,
+    pub force_cloud: bool,
+    pub debug_log: bool,
+    pub push_data_buffer: futures::lock::Mutex<Vec<serde_json::Value>>,
     // Remove non proxy client after everything is implemented in apify_client
-    client: reqwest::Client,
-    proxy_client: reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
+    pub client: reqwest::Client,
+    pub proxy_client: reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
     max_concurrency: usize,
     max_request_retries: usize
 }
@@ -107,22 +107,10 @@ impl BasicCrawler {
         }
     }
 
-    pub async fn handle_request_function(&self, req: &Request)
-        -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let extract_data_result = extract_data_from_url(
-            &req,
-            &self.actor,
-            &self.extract,
-            &self.client,
-            &self.proxy_client,
-            &self.push_data_buffer,
-            self.force_cloud,
-            self.debug_log,
-        ).await;
-        extract_data_result
-    }
-
-    pub async fn run(self) { 
+    pub async fn run<F>(self, handle_request_function: impl Fn(&Request, &BasicCrawler) -> F + Send + Sync)
+    where
+    F: Future<Output=HandleRequestOutput> + Send + Sync
+     { 
         // Scope is needed for non 'static futures so we can pass normal references around
         // instead of putting everything behind Arc
 
@@ -183,7 +171,8 @@ impl BasicCrawler {
                     println!("Spawning extraction for {}", req.url);
                 }
 
-                let extract_data_result = self.handle_request_function(&req).await;
+                // let extract_data_result = self.handle_request_function(&req).await;
+                let extract_data_result = handle_request_function(&req, &self).await;
 
                 if self.debug_log {
                     println!("Extraction finished for {}", req.url);
