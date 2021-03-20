@@ -10,7 +10,6 @@ use crate::storage::{ push_data, request_text};
 use crate::request::Request;
 // use crate::errors::CrawlerError;
 
-
 pub async fn extract_data_from_url(
     req: &Request, // immutable here
     actor: &crate::actor::Actor,
@@ -83,6 +82,9 @@ pub async fn extract_data_from_url(
     let now = Instant::now();
 
     {
+        // We could theoretically use non-async mutex here
+        // but it would require to copy the data (so we don't hold across push_data)
+        // Note sure what is better
         let mut locked_vec = push_data_buffer.lock().await;
         locked_vec.push(value);
         let vec_len = locked_vec.len();

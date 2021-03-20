@@ -190,16 +190,12 @@ impl Crawler {
                             println!("SUCCESS: Retry count: {}, URL: {}",
                             req.retry_count, req.url); 
                         }
-                        self.request_list.mark_request_handled(&req);
+                        self.request_list.mark_request_handled(req);
                     },
                     Err(ref e) if req.retry_count < self.max_request_retries => {
-                        // reclaim_request inlined here
                         println!("ERROR: Reclaiming request! Retry count: {}, URL: {}, error: {}",
                             req.retry_count, req.url, e);
-                        let index = *self.request_list.unique_key_to_index.get(&req.unique_key).unwrap();
-                        let mut locked_state = self.request_list.state.lock();
-                        locked_state.requests[index].retry_count += 1;
-                        locked_state.reclaimed.insert(req.unique_key);
+                            self.request_list.reclaim_request(req);
                     },
                     Err(ref e) => {
                         // mark_request_failed
