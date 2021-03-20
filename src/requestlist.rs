@@ -1,4 +1,3 @@
-use futures::lock::{Mutex};
 use std::collections::{HashSet, HashMap};
 
 use crate::request::Request;
@@ -13,7 +12,8 @@ pub struct RequestListState {
 }
 
 pub struct RequestList {
-    pub state: Mutex<RequestListState>,
+    // WARNING: We must never hold this lock across await (it will freeze)
+    pub state: parking_lot::Mutex<RequestListState>,
     pub unique_key_to_index: HashMap<String, usize>,
 }
 
@@ -38,15 +38,13 @@ impl RequestList {
             requests,
         };
         RequestList {
-            state: Mutex::new(fresh_state),
+            state: parking_lot::Mutex::new(fresh_state),
             unique_key_to_index,
         }
     }
 
-    // We should be able to use sync parking_lot mutex
-    pub async fn fetch_next_request(&self) -> Option<Request> {
-        
-        let mut locked_state = self.state.lock().await;  
+    pub fn fetch_next_request(&self) -> Option<Request> {
+        let mut locked_state = self.state.lock();  
         // println!("Fetch start, reclaimed length: {}", locked_state.reclaimed.len());
         // First check reclaimed if empty then fetch next
 
@@ -78,9 +76,8 @@ impl RequestList {
         Some(next_req)
     }
 
-    // I use this fn inlined for now
-    pub async fn mark_request_handled(&self, req: Request) {
-        let mut locked_state = self.state.lock().await;
-        locked_state.in_progress.remove(&req.url);
+    pub fn mark_request_handled(&self, req: &Request) {
+        let mut locked_state = self.state.lock();
+        locked_state.in_progress.remove(&req.unique_key);
     }
 }

@@ -104,6 +104,11 @@ impl Crawler {
     }
 
     pub async fn run(self) { 
+        // Scope is needed for non 'static futures so we can pass normal references around
+        // instead of putting everything behind Arc
+
+        // SAFETY: With async scopes, it is possible to use mem::forget to leak the future
+        // We have control over that we don't do that here so that is fine
         let mut scope = unsafe {
             TokioScope::create()
         };
@@ -111,7 +116,7 @@ impl Crawler {
         loop {
             // Check concurrency
             let (in_progress_count, reclaimed_count) = {
-                let locked_state = self.request_list.state.lock().await;
+                let locked_state = self.request_list.state.lock();
                 (locked_state.in_progress.len(), locked_state.reclaimed.len())
             };
 
@@ -133,12 +138,12 @@ impl Crawler {
             }
 
             // This req is immutable, only mutable via requests vec
-            let req = match self.request_list.fetch_next_request().await {
+            let req = match self.request_list.fetch_next_request() {
                 None => {
                     // We still can have in_progress
                     let in_progress_count;
                     {
-                        let locked_state = self.request_list.state.lock().await;
+                        let locked_state = self.request_list.state.lock();
                         in_progress_count = locked_state.in_progress.len();
                     }
                     if in_progress_count > 0 {
@@ -175,26 +180,24 @@ impl Crawler {
 
                 // Log concurrency
                 if self.debug_log {
-                    let locked_state = self.request_list.state.lock().await;
+                    let locked_state = self.request_list.state.lock();
                     println!("In progress count:{}", locked_state.in_progress.len());
                 }
 
                 match extract_data_result {
                     Ok(()) => {
-                        // mark_request_handled inlined here
                         if self.debug_log {
                             println!("SUCCESS: Retry count: {}, URL: {}",
                             req.retry_count, req.url); 
                         }
-                        let mut locked_state = self.request_list.state.lock().await;
-                        locked_state.in_progress.remove(&req.unique_key);
+                        self.request_list.mark_request_handled(&req);
                     },
                     Err(ref e) if req.retry_count < self.max_request_retries => {
                         // reclaim_request inlined here
                         println!("ERROR: Reclaiming request! Retry count: {}, URL: {}, error: {}",
                             req.retry_count, req.url, e);
                         let index = *self.request_list.unique_key_to_index.get(&req.unique_key).unwrap();
-                        let mut locked_state = self.request_list.state.lock().await;
+                        let mut locked_state = self.request_list.state.lock();
                         locked_state.requests[index].retry_count += 1;
                         locked_state.reclaimed.insert(req.unique_key);
                     },
@@ -202,7 +205,7 @@ impl Crawler {
                         // mark_request_failed
                         println!("ERROR: Max retries reached, marking failed! Retry count: {}, URL: {}, error: {}",
                             req.retry_count, req.url, e);
-                        let mut locked_state = self.request_list.state.lock().await;
+                        let mut locked_state = self.request_list.state.lock();
                         locked_state.reclaimed.remove(&req.unique_key);
                         locked_state.in_progress.remove(&req.unique_key);
                     }
