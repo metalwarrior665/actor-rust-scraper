@@ -16,14 +16,22 @@ mod actor;
 mod dataset;
 mod utils;
 
+use basic_crawler::CrawlingContext;
 use requestlist::RequestList;
-use crate::http_crawler::HttpCrawler;
-use crate::basic_crawler::{BasicCrawlerOptions};
+// use crate::http_crawler::HttpCrawler;
+use crate::basic_crawler::{BasicCrawler,BasicCrawlerOptions};
 use input::{Input};
 use storage::{get_value}; 
 // use apify::actor::Actor;
 
 // To not compile libraries on Apify, it is important to not commit Cargo.lock
+
+/*
+Stuck on this error
+implementation of `FnOnce` is not general enough
+...`FnOnce<(&'0 request::Request, CrawlingContext<'_>)>` would have to be implemented for the type `for<'_, 'a> fn(&request::Request, CrawlingContext<'a>) -> impl futures::Future {my_innocent_fn}`, for some specific lifetime `'0`...
+...but `FnOnce<(&request::Request, CrawlingContext<'a>)>` is actually implemented for the type `for<'_, 'a> fn(&request::Request, CrawlingContext<'a>) -> impl futures::Future {my_innocent_fn}`
+*/
 
 #[tokio::main]
 async fn main() {
@@ -37,9 +45,18 @@ async fn main() {
 
     let options: BasicCrawlerOptions = input.to_options();
 
-    let crawler = HttpCrawler::new(req_list, options);
+    let crawler = BasicCrawler::new(req_list, options, my_innocent_fn);
+    // let crawler = HttpCrawler::new(req_list, options);
 
     println!("STATUS --- Starting Crawler");
     
-    crawler.run().await;
+    // crawler.run().await;
+}
+
+use request::Request;
+use basic_crawler::HandleRequestOutput;
+
+async fn my_innocent_fn <'a>(req: &'_ Request, context: CrawlingContext<'a>) -> HandleRequestOutput {
+    println!("Running with {}", req.url);
+    Ok(())
 }

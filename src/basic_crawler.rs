@@ -9,10 +9,11 @@ use std::collections::HashMap;
 use std::time::{Instant};
 
 use std::time::Duration;
+use std::future::Future;
 
 use async_scoped::TokioScope;
 
-type HandleRequestOutput = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+pub type HandleRequestOutput = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 pub struct BasicCrawlerOptions {
     extract: Vec<Extract>,
@@ -66,7 +67,25 @@ impl BasicCrawlerOptions {
     }
 }
 
-pub struct BasicCrawler {
+pub struct CrawlingContext<'a> {
+    actor: &'a crate::actor::Actor,
+    extract: &'a Vec<Extract>,
+    force_cloud: bool,
+    debug_log: bool,
+    push_data_buffer: &'a futures::lock::Mutex<Vec<serde_json::Value>>,
+    // Remove non proxy client after everything is implemented in apify_client
+    client: &'a reqwest::Client,
+    proxy_client: &'a reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
+    max_concurrency: usize,
+    max_request_retries: usize,
+}
+
+pub struct BasicCrawler<Fun, Fut>
+where
+    Fun: Fn(&Request, CrawlingContext) -> Fut,
+    Fut: std::future::Future<Output=HandleRequestOutput> + Send + Sync,
+    // Fut: std::future::Future,
+{
     request_list: RequestList,
     actor: crate::actor::Actor,
     extract: Vec<Extract>,
@@ -77,11 +96,18 @@ pub struct BasicCrawler {
     client: reqwest::Client,
     proxy_client: reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
     max_concurrency: usize,
-    max_request_retries: usize
+    max_request_retries: usize,
+    handle_request_function: Fun,
 }
 
-impl BasicCrawler {
-    pub fn new(request_list: RequestList, options: BasicCrawlerOptions) -> BasicCrawler {
+impl <Fun, Fut> BasicCrawler <Fun, Fut> 
+    where
+    Fun: Fn(&Request, CrawlingContext) -> Fut + Send + Sync,
+    Fut: std::future::Future<Output=HandleRequestOutput> + Send + Sync,
+    {
+    pub fn new(request_list: RequestList, options: BasicCrawlerOptions, handle_request_function: Fun)
+    -> BasicCrawler <Fun, Fut> {
+    
         println!("STATUS --- Initializing crawler");
         let client = reqwest::Client::builder().build().unwrap();
 
@@ -106,8 +132,13 @@ impl BasicCrawler {
             force_cloud: options.force_cloud,
             debug_log: options.debug_log,
             max_concurrency: options.max_concurrency,
-            max_request_retries: options.max_request_retries
+            max_request_retries: options.max_request_retries,
+            handle_request_function,
         }
+    }
+
+    pub async fn log(&self) {
+        println!("logging {}", self.max_concurrency);
     }
 
     pub async fn run(self) { 
@@ -171,7 +202,19 @@ impl BasicCrawler {
                     println!("Spawning extraction for {}", req.url);
                 }
 
-                let extract_data_result = BasicCrawler::handle_request_function_default(&req, &self).await;
+                let crawlingContext = CrawlingContext {
+                    actor: &self.actor,
+                    extract: &self.extract,
+                    force_cloud: self.force_cloud,
+                    debug_log: self.debug_log,
+                    push_data_buffer: &self.push_data_buffer,
+                    client: &self.client,
+                    proxy_client: &self.proxy_client,
+                    max_concurrency: self.max_concurrency,
+                    max_request_retries: self.max_request_retries,
+                };
+
+                let extract_data_result = (self.handle_request_function)(&req, crawlingContext).await;
 
                 if self.debug_log {
                     println!("Extraction finished for {}", req.url);
@@ -216,8 +259,8 @@ impl BasicCrawler {
         push_data(locked_vec.clone(), &self.client, self.force_cloud).await.unwrap(); 
     } 
 
-    pub async fn handle_request_function_default (req: &Request, basic_crawler: &BasicCrawler)
-        -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn handle_request_function_default <'a>(req: &Request, basic_crawler: CrawlingContext<'a>)
+        -> HandleRequestOutput {
         let url = &req.url;
         if basic_crawler.debug_log {
             println!("Started extraction --- {}", url);

@@ -1,6 +1,11 @@
+/*
 use crate::basic_crawler::{BasicCrawler, BasicCrawlerOptions};
 use crate::requestlist::RequestList;
 use crate::input::{Extract, ProxySettings};
+use crate::request::Request;
+use crate::basic_crawler::HandleRequestOutput;
+
+use std::future::Future;
 
 pub struct HtppCrawlerOptions {
     extract: Vec<Extract>,
@@ -54,11 +59,14 @@ impl HtppCrawlerOptions {
     }
 }
 
-pub struct HttpCrawler {
-    pub basic_crawler: BasicCrawler,
+pub struct HttpCrawler <F, Fut> where
+    Fut: Future<Output=HandleRequestOutput> + Send + Sync,
+    F: Fn(&Request, &BasicCrawler<F, Fut>) -> Fut + Send + Sync
+{
+    pub basic_crawler: BasicCrawler <F, Fut>,
 }
 
-impl HttpCrawler {
+impl <F, Fut> HttpCrawler <F, Fut> {
     pub fn new(request_list: RequestList, options: BasicCrawlerOptions) -> Self {
         HttpCrawler {
             basic_crawler: BasicCrawler::new(request_list, options),
@@ -69,3 +77,4 @@ impl HttpCrawler {
         self.basic_crawler.run().await;
     }
 }
+*/
