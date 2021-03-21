@@ -9,7 +9,6 @@ mod request;
 mod input;
 mod storage;
 mod proxy;
-mod extract_fn;
 mod errors;
 
 // SDK testing here

@@ -1,9 +1,12 @@
 use crate::requestlist::RequestList;
 use crate::request::Request;
-use crate::input::{Extract, ProxySettings};
-use crate::extract_fn::extract_data_from_url;
+use crate::input::{Extract, ExtractType, ProxySettings};
 use crate::proxy:: {get_apify_proxy};
-use crate::storage:: {push_data};
+use scraper::{Selector, Html};
+use serde_json::{Value};
+use crate::storage::{ push_data, request_text};
+use std::collections::HashMap;
+use std::time::{Instant};
 
 use std::time::Duration;
 
@@ -107,21 +110,6 @@ impl BasicCrawler {
         }
     }
 
-    pub async fn handle_request_function(&self, req: &Request)
-        -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let extract_data_result = extract_data_from_url(
-            &req,
-            &self.actor,
-            &self.extract,
-            &self.client,
-            &self.proxy_client,
-            &self.push_data_buffer,
-            self.force_cloud,
-            self.debug_log,
-        ).await;
-        extract_data_result
-    }
-
     pub async fn run(self) { 
         // Scope is needed for non 'static futures so we can pass normal references around
         // instead of putting everything behind Arc
@@ -183,7 +171,7 @@ impl BasicCrawler {
                     println!("Spawning extraction for {}", req.url);
                 }
 
-                let extract_data_result = self.handle_request_function(&req).await;
+                let extract_data_result = BasicCrawler::handle_request_function_default(&req, &self).await;
 
                 if self.debug_log {
                     println!("Extraction finished for {}", req.url);
@@ -227,4 +215,109 @@ impl BasicCrawler {
         println!("Remaing Push data buffer length before last push:{}", locked_vec.len());
         push_data(locked_vec.clone(), &self.client, self.force_cloud).await.unwrap(); 
     } 
+
+    pub async fn handle_request_function_default (req: &Request, basic_crawler: &BasicCrawler)
+        -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let url = &req.url;
+        if basic_crawler.debug_log {
+            println!("Started extraction --- {}", url);
+        }
+    
+        // Random fail for testing errors
+        /*
+        {
+            let mut rng = rand::thread_rng();
+            if rng.gen::<bool>() {
+                return Err(Box::new(CrawlerError::new(String::from("Testing error"))));
+            }
+        }
+        */
+    
+        let now = Instant::now();
+        let html = request_text(&url, &basic_crawler.proxy_client).await?;
+        let request_time = now.elapsed().as_millis();
+    
+        // println!("Reqwest retuned");
+        let mut map: HashMap<String, Value> = HashMap::new();
+        let parse_time;
+        let extract_time;
+        {
+            let now = Instant::now();
+            let dom = Html::parse_document(&html);
+            parse_time = now.elapsed().as_millis();
+        
+            let now = Instant::now();
+            for extr in basic_crawler.extract.iter() {
+                let selector_bind = &extr.selector.clone();
+                // TODO: Implement std::Error
+                let selector = Selector::parse(selector_bind).unwrap();
+                let element = dom.select(&selector).next();
+                let val = match element {
+                    Some(element) => {
+                        // println!("matched element");
+                        let extracted_value = match &extr.extract_type {
+                            ExtractType::Text => element.text().fold(String::from(""), |acc, s| acc + s).trim().to_owned(),
+                            // TODO: Implement std::Error
+                            ExtractType::Attribute(at) => element.value().attr(&at).unwrap().to_owned()
+                        };
+                        Some(extracted_value)
+                    },
+                    None => None
+                };
+                let insert_value = match val {
+                    Some(string) => Value::String(string),
+                    None => Value::Null,
+                };
+                map.insert(extr.field_name.clone(), insert_value);
+            }
+            extract_time = now.elapsed().as_millis();
+        }
+        
+        let map_size = map.len();
+    
+        let value = serde_json::to_value(map)?;
+    
+        let now = Instant::now();
+    
+        {
+            // We could theoretically use non-async mutex here
+            // but it would require to copy the data (so we don't hold across push_data)
+            // Note sure what is better
+            let mut locked_vec = basic_crawler.push_data_buffer.lock().await;
+            locked_vec.push(value);
+            let vec_len = locked_vec.len();
+            if basic_crawler.debug_log {
+                println!("Push data buffer length:{}", vec_len);
+            }
+            if vec_len >= locked_vec.capacity() { // Capacity should never grow over original push_data_size
+                println!("Flushing data buffer --- length: {}", locked_vec.len());
+                if basic_crawler.force_cloud {
+                    basic_crawler.actor.client.put_items(&apify_client::client::IdOrName::Id("qdFyJscHebXJqilLu".to_string()), &*locked_vec)
+                        .send().await?;
+                } else {
+                    push_data(locked_vec.clone(), &basic_crawler.client, basic_crawler.force_cloud).await?; 
+                }
+                // TODO: Fix actor implementation
+                // actor.push_data(&locked_vec).await?;
+                locked_vec.truncate(0);
+                println!("Flushed data buffer --- length: {}", locked_vec.len());
+            }
+        }
+        
+        let push_time = now.elapsed().as_millis();
+        
+        if basic_crawler.debug_log {
+            println!(
+                "SUCCESS({}/{}) - {} - timings (in ms) - request: {}, parse: {}, extract: {}, push: {}",
+                map_size,
+                basic_crawler.extract.len(),
+                url,
+                request_time,
+                parse_time,
+                extract_time,
+                push_time
+            );
+        }
+        Ok(())
+    }
 }
