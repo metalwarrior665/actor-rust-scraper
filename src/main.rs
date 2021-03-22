@@ -56,7 +56,7 @@ async fn main() {
 use request::Request;
 use basic_crawler::HandleRequestOutput;
 
-async fn my_innocent_fn <'a>(req: &'_ Request, context: CrawlingContext<'a>) -> HandleRequestOutput {
+async fn my_innocent_fn <'a>(req: &Request, context: CrawlingContext<'a>) -> HandleRequestOutput {
     println!("Running with {}", req.url);
     Ok(())
 }

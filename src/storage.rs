@@ -12,7 +12,7 @@ pub fn get_is_on_apify() -> bool {
 }
 
 // I'm not using reference because trying to make borrow checker happy
-pub async fn push_data (data: Vec<Value>, client: &reqwest::Client, force_cloud: bool) 
+pub async fn push_data (data: Vec<Value>, client: &reqwest::Client, /*force_cloud: bool*/) 
     -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let is_on_apify = get_is_on_apify();
     if is_on_apify {
@@ -21,13 +21,13 @@ pub async fn push_data (data: Vec<Value>, client: &reqwest::Client, force_cloud:
         let token = env::var("APIFY_TOKEN")?;
         let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", default_dataset, token);
         client.post(&url).body(json).header("Content-Type", "application/json").send().await?;
-    } else if force_cloud {
+    } /*else if force_cloud {
         let json = serde_json::to_string(&data)?;
         let cloud_test_dataset = "w7xbAHYhyoz3v8K8r";
         let token = env::var("APIFY_TOKEN")?;
         let url = format!("https://api.apify.com/v2/datasets/{}/items?token={}", cloud_test_dataset, token);
         client.post(&url).body(json).header("Content-Type", "application/json").send().await?;
-    } else {
+    } */else {
         for val in data.iter() {
             let json = serde_json::to_string(&val)?;
             let mut rng = rand::thread_rng();
