@@ -22,6 +22,7 @@ use requestlist::RequestList;
 use crate::basic_crawler::{BasicCrawler,BasicCrawlerOptions};
 use input::{Input};
 use storage::{get_value}; 
+use tokio::time::sleep;
 // use apify::actor::Actor;
 
 // To not compile libraries on Apify, it is important to not commit Cargo.lock
@@ -50,13 +51,17 @@ async fn main() {
 
     println!("STATUS --- Starting Crawler");
     
-    // crawler.run().await;
+    crawler.run().await;
 }
 
 use request::Request;
 use basic_crawler::HandleRequestOutput;
 
-async fn my_innocent_fn <'a>(req: &Request, context: CrawlingContext<'a>) -> HandleRequestOutput {
+async fn my_innocent_fn(
+    req: &Request,
+    //context: CrawlingContext<'a>
+) -> HandleRequestOutput {
+    sleep(std::time::Duration::from_millis(5000)).await;
     println!("Running with {}", req.url);
     Ok(())
 }

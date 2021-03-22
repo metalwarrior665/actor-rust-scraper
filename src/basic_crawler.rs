@@ -81,33 +81,39 @@ pub struct CrawlingContext<'a> {
     max_request_retries: &'a usize,
 }
 
-pub trait Wrapped<'a> {
+pub trait Wrapped<'a, 'b> {
     type Fut: 'a + Future<Output = HandleRequestOutput> + Send + Sync;
     fn call(
         &self,
         req: &'a Request,
-        context: CrawlingContext,
+        //context: CrawlingContext<'b>,
     ) -> Self::Fut;
 }
 
-impl<'a, Fun, LoadFut> Wrapped<'a> for Fun
+impl<'a, 'b, Fun, LoadFut> Wrapped<'a, 'b> for Fun
 where
-    Fun: Send + Sync + Fn(&'a Request,  CrawlingContext) -> LoadFut,
+    Fun: Send + Sync + Fn(
+        &'a Request,
+        //CrawlingContext
+    ) -> LoadFut,
     LoadFut: Future<Output = HandleRequestOutput> + 'a + Send + Sync,
 {
     type Fut = LoadFut;
     fn call(
         &self,
         req: &'a Request,
-        context: CrawlingContext,
+        //context: CrawlingContext<'b>,
     ) -> Self::Fut {
-        (self)(req, context)//context)
+        (self)(
+            req,
+            //context
+        )
     }
 }
 
 pub struct BasicCrawler<Fun>
 where
-for<'r> Fun:  Wrapped<'r> + Send + Sync,
+// for<'r> Fun:  Wrapped<'r> + Send + Sync,
 /*
     Fun: Fn(& Request, CrawlingContext) -> Fut,
     Fut: Future<Output=HandleRequestOutput> + Send + Sync,
@@ -129,7 +135,7 @@ for<'r> Fun:  Wrapped<'r> + Send + Sync,
 
 impl <Fun> BasicCrawler <Fun> 
 where 
-for<'r> Fun:  Wrapped<'r> + Send + Sync,
+for<'r, 'b> Fun:  Wrapped<'r, 'b> + Send + Sync,
     {
     pub fn new(request_list: RequestList, options: BasicCrawlerOptions, handle_request_function: Fun)
     -> BasicCrawler <Fun>
@@ -224,8 +230,6 @@ for<'r> Fun:  Wrapped<'r> + Send + Sync,
                 Some(req) => req
             };
 
-            let cloned_req = req.clone();
-
             let crawlingContext = CrawlingContext {
                 actor: &self.actor,
                 extract: &self.extract,
@@ -245,7 +249,10 @@ for<'r> Fun:  Wrapped<'r> + Send + Sync,
                     println!("Spawning extraction for {}", req.url);
                 }
 
-                let extract_data_result = self.handle_request_function.call(&req, crawlingContext).await;
+                let extract_data_result = self.handle_request_function.call(
+                    &req,
+                    //crawlingContext
+                ).await;
 
                 if self.debug_log {
                     println!("Extraction finished for {}", req.url);
