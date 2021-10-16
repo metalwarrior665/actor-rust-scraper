@@ -86,6 +86,7 @@ pub trait Wrapped<'a, 'b> {
     fn call(
         &self,
         req: &'a Request,
+        int: usize,
         //context: CrawlingContext<'b>,
     ) -> Self::Fut;
 }
@@ -94,6 +95,7 @@ impl<'a, 'b, Fun, LoadFut> Wrapped<'a, 'b> for Fun
 where
     Fun: Send + Sync + Fn(
         &'a Request,
+        usize,
         //CrawlingContext
     ) -> LoadFut,
     LoadFut: Future<Output = HandleRequestOutput> + 'a + Send + Sync,
@@ -102,10 +104,12 @@ where
     fn call(
         &self,
         req: &'a Request,
+        int: usize,
         //context: CrawlingContext<'b>,
     ) -> Self::Fut {
         (self)(
             req,
+            int,
             //context
         )
     }
@@ -251,6 +255,7 @@ for<'r, 'b> Fun:  Wrapped<'r, 'b> + Send + Sync,
 
                 let extract_data_result = self.handle_request_function.call(
                     &req,
+                    2,
                     //crawlingContext
                 ).await;
 

@@ -59,9 +59,10 @@ use basic_crawler::HandleRequestOutput;
 
 async fn my_innocent_fn(
     req: &Request,
+    int: usize,
     //context: CrawlingContext<'a>
 ) -> HandleRequestOutput {
     sleep(std::time::Duration::from_millis(5000)).await;
-    println!("Running with {}", req.url);
+    println!("Running with {} and {}", req.url, int);
     Ok(())
 }
