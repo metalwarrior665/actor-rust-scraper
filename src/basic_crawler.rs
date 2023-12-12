@@ -23,6 +23,7 @@ pub struct BasicCrawlerOptions {
     push_data_size: usize,
     max_concurrency: usize,
     max_request_retries: usize,
+    use_http3: bool,
 }
 
 impl Default for BasicCrawlerOptions {
@@ -34,7 +35,8 @@ impl Default for BasicCrawlerOptions {
             max_concurrency: 200,
             max_request_retries: 3,
             proxy_settings: Some(Default::default()),
-            extract: vec![Default::default()]
+            extract: vec![Default::default()],
+            use_http3: false,
         }
     }
 }
@@ -79,6 +81,7 @@ pub struct CrawlingContext<'a> {
     proxy_client: &'a reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
     max_concurrency: &'a usize,
     max_request_retries: &'a usize,
+    use_http3: &'a bool,
 }
 
 pub trait Wrapped<'a, 'b> {
@@ -134,6 +137,7 @@ where
     proxy_client: reqwest::Client, // The reason for 2 clients is that proxy_client is used for websites and client for push_data
     max_concurrency: usize,
     max_request_retries: usize,
+    use_http3: bool,
     handle_request_function: Fun,
 }
 
@@ -172,6 +176,7 @@ for<'r, 'b> Fun:  Wrapped<'r, 'b> + Send + Sync,
             debug_log: options.debug_log,
             max_concurrency: options.max_concurrency,
             max_request_retries: options.max_request_retries,
+            use_http3: options.use_http3,
             handle_request_function,
         }
     }
@@ -244,6 +249,7 @@ for<'r, 'b> Fun:  Wrapped<'r, 'b> + Send + Sync,
                 proxy_client: &self.proxy_client,
                 max_concurrency: &self.max_concurrency,
                 max_request_retries: &self.max_request_retries,
+                use_http3: &self.use_http3,
             };
 
             // println!("Took new request: {:?}", req);

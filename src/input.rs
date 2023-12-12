@@ -25,6 +25,7 @@ pub struct Input {
     pub push_data_size: Option<usize>,
     pub max_concurrency: Option<usize>,
     pub max_request_retries: Option<usize>,
+    pub use_http3: Option<bool>,
 }
 
 impl Input {
