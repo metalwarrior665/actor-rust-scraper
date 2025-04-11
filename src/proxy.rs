@@ -10,8 +10,15 @@ pub struct Proxy {
 
 impl Proxy {
     fn new(username: String, password: String) -> Proxy {
+        let mut base_url = "http://@proxy.apify.com:8000".to_owned();
+        if env::var("APIFY_PROXY_HOSTNAME").is_ok() && env::var("APIFY_PROXY_PORT").is_ok() {
+            let hostname = env::var("APIFY_PROXY_HOSTNAME").unwrap();
+            let port = env::var("APIFY_PROXY_PORT").unwrap();
+            base_url = format!("http://@{}:{}", hostname, port);
+        }
+
         Proxy {
-            base_url: "http://@proxy.apify.com:8000".to_owned(),
+            base_url,
             username,
             password
         }
